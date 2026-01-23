@@ -8,7 +8,7 @@
       navToggle.setAttribute('aria-expanded', String(isOpen));
     });
 
-    navMenu.querySelectorAll('a').forEach((link) => {
+    navMenu.querySelectorAll('a, button').forEach((link) => {
       link.addEventListener('click', () => {
         navMenu.classList.remove('is-open');
         navToggle.setAttribute('aria-expanded', 'false');

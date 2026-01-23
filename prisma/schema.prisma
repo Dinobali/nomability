@@ -19,6 +19,7 @@ model User {
   jobs         Job[]
   magicLinks   MagicLinkToken[]
   resetTokens  PasswordResetToken[]
+  invoiceRequests InvoiceRequest[]
 }
 
 model Org {
@@ -34,6 +35,7 @@ model Org {
   subscription Subscription?
   creditBalance CreditBalance?
   usage       UsageRecord[]
+  invoiceRequests InvoiceRequest[]
 }
 
 model Membership {
@@ -143,4 +145,26 @@ model CreditBalance {
   updatedAt       DateTime @updatedAt
 
   org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model InvoiceRequest {
+  id             String   @id @default(uuid())
+  orgId          String
+  userId         String?
+  planKey        String
+  amountCents    Int
+  currency       String   @default("EUR")
+  status         String   @default("pending")
+  invoiceNumber  String   @unique
+  billingName    String
+  billingAddress String
+  billingPhone   String
+  dueDate        DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([orgId])
 }

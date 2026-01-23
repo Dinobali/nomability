@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import Stripe from 'stripe';
 import { prisma } from '../lib/db.js';
 import { env } from '../config/env.js';
+import { getDisplayIncludedMinutes, getPlanByKey, getPlanLabel, getPriceIdForPlan } from '../lib/plans.js';
 
 const stripe = env.STRIPE_SECRET_KEY
   ? new Stripe(env.STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' })
@@ -12,9 +13,10 @@ export const billingRoutes = async (app: FastifyInstance) => {
     if (!stripe) {
       return reply.status(400).send({ error: 'Stripe is not configured.' });
     }
-    const body = req.body as { plan?: 'monthly' | 'payg'; hours?: number };
-    const plan = body.plan || 'monthly';
-    const priceId = plan === 'monthly' ? env.STRIPE_PRICE_MONTHLY : env.STRIPE_PRICE_PAYG;
+    const body = req.body as { plan?: string; hours?: number };
+    const plan = body.plan || 'starter';
+    const isPayg = plan === 'payg';
+    const priceId = isPayg ? env.STRIPE_PRICE_PAYG : getPriceIdForPlan(plan);
 
     if (!priceId) {
       return reply.status(400).send({ error: 'Stripe price ID missing.' });
@@ -37,7 +39,6 @@ export const billingRoutes = async (app: FastifyInstance) => {
       });
     }
 
-    const isPayg = plan === 'payg';
     const quantity = isPayg ? Math.max(1, Math.floor(body.hours || 1)) : 1;
 
     const session = await stripe.checkout.sessions.create({
@@ -107,12 +108,92 @@ export const billingRoutes = async (app: FastifyInstance) => {
       },
       _sum: { minutes: true }
     });
+    const includedMinutes = subscription
+      ? getDisplayIncludedMinutes(subscription.priceId)
+      : 0;
     return reply.send({
       subscription,
       credits: credits?.minutesRemaining || 0,
       usageThisMonth: usage._sum.minutes || 0,
-      includedMinutes: env.PLAN_INCLUDED_MINUTES
+      includedMinutes,
+      unlimited: includedMinutes === null,
+      planLabel: subscription ? getPlanLabel(subscription.priceId) : null
     });
+  });
+
+  app.get('/api/billing/bank-details', async (_req, reply) => {
+    const bank = {
+      accountHolder: env.BANK_ACCOUNT_HOLDER,
+      iban: env.BANK_IBAN,
+      bic: env.BANK_BIC,
+      bankName: env.BANK_NAME
+    };
+
+    if (!bank.iban) {
+      return reply.status(404).send({ error: 'Bank details not configured.' });
+    }
+
+    return reply.send({ bank });
+  });
+
+  app.post('/api/billing/invoice', { preHandler: app.authenticate }, async (req, reply) => {
+    const body = req.body as { plan?: string; name?: string; address?: string; phone?: string };
+    const plan = getPlanByKey(body.plan || 'starter');
+
+    if (!plan || plan.amountCents == null) {
+      return reply.status(400).send({ error: 'Invalid plan.' });
+    }
+
+    if (!body.name || !body.address || !body.phone) {
+      return reply.status(400).send({ error: 'Name, address, and phone are required.' });
+    }
+
+    const user = req.user as { sub: string; orgId?: string };
+    if (!user.orgId) {
+      return reply.status(400).send({ error: 'Organization not found.' });
+    }
+
+    const invoiceNumber = await generateInvoiceNumber();
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 14);
+
+    const invoice = await prisma.invoiceRequest.create({
+      data: {
+        orgId: user.orgId,
+        userId: user.sub,
+        planKey: plan.key,
+        amountCents: plan.amountCents,
+        invoiceNumber,
+        billingName: body.name,
+        billingAddress: body.address,
+        billingPhone: body.phone,
+        dueDate
+      }
+    });
+
+    return reply.send({
+      invoice,
+      bank: {
+        accountHolder: env.BANK_ACCOUNT_HOLDER,
+        iban: env.BANK_IBAN,
+        bic: env.BANK_BIC,
+        bankName: env.BANK_NAME
+      }
+    });
+  });
+
+  app.get('/api/billing/invoice', { preHandler: app.authenticate }, async (req, reply) => {
+    const user = req.user as { sub: string; orgId?: string };
+    if (!user.orgId) {
+      return reply.status(400).send({ error: 'Organization not found.' });
+    }
+
+    const invoices = await prisma.invoiceRequest.findMany({
+      where: { orgId: user.orgId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return reply.send({ invoices });
   });
 
   app.post('/api/billing/webhook', { config: { rawBody: true } }, async (req, reply) => {
@@ -195,6 +276,20 @@ export const billingRoutes = async (app: FastifyInstance) => {
 
     return reply.send({ received: true });
   });
+};
+
+const generateInvoiceNumber = async () => {
+  const now = new Date();
+  const prefix = `INV-${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const suffix = String(Math.floor(1000 + Math.random() * 9000));
+    const invoiceNumber = `${prefix}-${suffix}`;
+    const existing = await prisma.invoiceRequest.findUnique({ where: { invoiceNumber } });
+    if (!existing) return invoiceNumber;
+  }
+
+  throw new Error('Unable to generate invoice number.');
 };
 
 const resolveOrgId = async (stripeCustomerId: string) => {

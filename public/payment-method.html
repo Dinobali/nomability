@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomability Payment Method</title>
+  <meta name="description" content="Choose a payment method for your Nomability subscription." />
+  <link rel="stylesheet" href="nomability.css">
+  <script defer src="nomability.js"></script>
+  <script defer src="nomability-auth.js"></script>
+  <script defer src="nomability-payment.js"></script>
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <nav class="nm-nav-links" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/index.html#product">Product</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="app.html">Studio</a>
+      </nav>
+      <div class="nm-nav-actions">
+        <a class="nm-btn nm-btn-ghost" href="app.html">Studio</a>
+        <div class="nm-auth-actions">
+          <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
+          <a class="nm-btn nm-btn-primary" href="register.html" data-auth-open="register" data-auth-show="logged-out">Register</a>
+          <div class="nm-profile" data-auth-profile data-auth-show="logged-in" hidden>
+            <button class="nm-avatar" type="button" data-auth-avatar aria-haspopup="menu" aria-expanded="false">
+              <span data-auth-initials>U</span>
+            </button>
+            <div class="nm-profile-menu" data-auth-menu role="menu" hidden>
+              <div class="nm-profile-meta">
+                <span class="nm-profile-name" data-auth-name>Account</span>
+                <span class="nm-profile-email" data-auth-email></span>
+              </div>
+              <div class="nm-divider"></div>
+              <a href="profile.html" role="menuitem">Account</a>
+              <a href="profile.html" role="menuitem">Profile</a>
+              <a href="profile.html" role="menuitem">Settings</a>
+              <a href="profile.html" role="menuitem">Billing</a>
+              <button type="button" data-auth-logout role="menuitem">Log out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="nm-nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false" data-nav-toggle>
+        Menu
+      </button>
+    </div>
+    <div class="nm-nav-mobile" data-nav-menu>
+      <a href="/">Home</a>
+      <a href="/index.html#product">Product</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="app.html">Studio</a>
+      <div class="nm-nav-mobile-auth">
+        <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
+        <a class="nm-btn nm-btn-primary" href="register.html" data-auth-open="register" data-auth-show="logged-out">Register</a>
+        <a class="nm-btn nm-btn-ghost" href="profile.html" data-auth-show="logged-in" hidden>Account</a>
+        <a class="nm-btn nm-btn-ghost" href="profile.html" data-auth-show="logged-in" hidden>Profile</a>
+        <button class="nm-btn nm-btn-ghost" type="button" data-auth-logout data-auth-show="logged-in" hidden>Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="nm-app-shell">
+    <div class="nm-wrap">
+      <section class="nm-panel nm-payment-summary nm-reveal" data-reveal>
+        <div>
+          <span class="nm-pill">Selected plan</span>
+          <h1 class="nm-section-title" data-plan-title>Starter</h1>
+          <p class="nm-section-subtitle" data-plan-subtitle>10 hours / month</p>
+        </div>
+        <div class="nm-payment-price">
+          <span data-plan-price>9,99€</span>
+          <span>/ month</span>
+        </div>
+        <a class="nm-btn nm-btn-ghost" href="pricing.html">Change plan</a>
+      </section>
+
+      <section class="nm-payment-grid" style="margin-top: 24px;">
+        <article class="nm-panel nm-payment-card nm-reveal" data-reveal>
+          <div>
+            <h2>Card, Apple Pay, Google Pay</h2>
+            <p class="nm-help">Secure checkout powered by Stripe. Supports Visa, Mastercard, and local payment methods.</p>
+          </div>
+          <button class="nm-btn nm-btn-primary" type="button" data-payment="stripe">Pay with card</button>
+        </article>
+
+        <article class="nm-panel nm-payment-card nm-reveal" data-reveal style="--reveal-delay: 120ms;">
+          <div>
+            <h2>Invoice (EU transfer)</h2>
+            <p class="nm-help">Pay by bank transfer. Include your company name + VAT ID in the reference.</p>
+            <div class="nm-bank-details" style="margin-top: 12px;">
+              <div><strong>Account holder:</strong> <span data-bank-field="accountHolder">Loading...</span></div>
+              <div><strong>IBAN:</strong> <span data-bank-field="iban">Loading...</span></div>
+              <div><strong>BIC:</strong> <span data-bank-field="bic">Loading...</span></div>
+              <div><strong>Bank:</strong> <span data-bank-field="bankName">Loading...</span></div>
+            </div>
+          </div>
+          <button class="nm-btn nm-btn-ghost" type="button" data-invoice-open>Request invoice</button>
+        </article>
+
+        <article class="nm-panel nm-payment-card nm-reveal" data-reveal style="--reveal-delay: 220ms;">
+          <div>
+            <h2>PayPal</h2>
+            <p class="nm-help">Prefer PayPal? We can send you a PayPal invoice for the selected plan.</p>
+          </div>
+          <a class="nm-btn nm-btn-ghost" data-payment="paypal" href="mailto:support@nomability.net">Pay with PayPal</a>
+        </article>
+      </section>
+
+      <p class="nm-help" data-payment-status style="margin-top: 14px;"></p>
+    </div>
+  </main>
+
+  <div class="nm-auth-overlay nm-invoice-modal" data-invoice-modal hidden>
+    <div class="nm-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="nm-invoice-title">
+      <button class="nm-auth-close" type="button" aria-label="Close" data-invoice-close>x</button>
+      <div class="nm-auth-header">
+        <span class="nm-pill">Invoice request</span>
+        <h2 class="nm-auth-title" id="nm-invoice-title">Send invoice details</h2>
+      </div>
+      <form class="nm-grid" id="invoice-form" style="gap: 16px;">
+        <div class="nm-field">
+          <label for="invoice-name">Full name</label>
+          <input id="invoice-name" class="nm-input" type="text" required />
+        </div>
+        <div class="nm-field">
+          <label for="invoice-address">Address</label>
+          <input id="invoice-address" class="nm-input" type="text" required placeholder="Street, city, postal code, country" />
+        </div>
+        <div class="nm-field">
+          <label for="invoice-phone">Phone</label>
+          <input id="invoice-phone" class="nm-input" type="tel" required />
+        </div>
+        <button class="nm-btn nm-btn-primary" type="submit">Create invoice</button>
+      </form>
+      <p class="nm-help" data-invoice-status style="margin-top: 12px;"></p>
+    </div>
+  </div>
+
+  <div class="nm-auth-overlay" data-auth-modal hidden>
+    <div class="nm-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="nm-auth-title">
+      <button class="nm-auth-close" type="button" aria-label="Close" data-auth-close>x</button>
+      <div class="nm-auth-header">
+        <span class="nm-pill">Welcome to Nomability</span>
+        <h2 class="nm-auth-title" id="nm-auth-title">Sign in or create an account</h2>
+      </div>
+      <div class="nm-tabs nm-auth-tabs" role="tablist">
+        <button class="nm-tab active" type="button" data-auth-tab="login" role="tab" aria-selected="true">Login</button>
+        <button class="nm-tab" type="button" data-auth-tab="register" role="tab" aria-selected="false">Register</button>
+      </div>
+      <div class="nm-auth-panel" data-auth-panel="login" role="tabpanel">
+        <form data-auth-form="login" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="auth-login-email">Email</label>
+            <input id="auth-login-email" class="nm-input" type="email" required data-auth-input="login-email" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-login-password">Password</label>
+            <input id="auth-login-password" class="nm-input" type="password" required data-auth-input="login-password" />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Login</button>
+        </form>
+        <p class="nm-help" data-auth-status="login" style="margin-top: 10px;"></p>
+        <div class="nm-auth-footer">
+          <a class="nm-btn nm-btn-ghost" href="magic-link.html">Send magic link</a>
+          <a class="nm-btn nm-btn-ghost" href="reset-password.html">Forgot password</a>
+        </div>
+      </div>
+      <div class="nm-auth-panel" data-auth-panel="register" role="tabpanel" hidden>
+        <form data-auth-form="register" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="auth-register-name">Name</label>
+            <input id="auth-register-name" class="nm-input" type="text" data-auth-input="register-name" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-register-org">Organization</label>
+            <input id="auth-register-org" class="nm-input" type="text" placeholder="Your team or company" data-auth-input="register-org" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-register-email">Email</label>
+            <input id="auth-register-email" class="nm-input" type="email" required data-auth-input="register-email" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-register-password">Password</label>
+            <input id="auth-register-password" class="nm-input" type="password" required data-auth-input="register-password" />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Create account</button>
+        </form>
+        <p class="nm-help" data-auth-status="register" style="margin-top: 10px;"></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomability Pricing</title>
+  <meta name="description" content="Compare Nomability subscription plans and choose the hours that fit your team." />
+  <link rel="stylesheet" href="nomability.css">
+  <script defer src="nomability.js"></script>
+  <script defer src="nomability-auth.js"></script>
+  <script defer src="nomability-pricing.js"></script>
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <nav class="nm-nav-links" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/index.html#product">Product</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="app.html">Studio</a>
+      </nav>
+      <div class="nm-nav-actions">
+        <a class="nm-btn nm-btn-ghost" href="app.html">Studio</a>
+        <div class="nm-auth-actions">
+          <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
+          <a class="nm-btn nm-btn-primary" href="register.html" data-auth-open="register" data-auth-show="logged-out">Register</a>
+          <div class="nm-profile" data-auth-profile data-auth-show="logged-in" hidden>
+            <button class="nm-avatar" type="button" data-auth-avatar aria-haspopup="menu" aria-expanded="false">
+              <span data-auth-initials>U</span>
+            </button>
+            <div class="nm-profile-menu" data-auth-menu role="menu" hidden>
+              <div class="nm-profile-meta">
+                <span class="nm-profile-name" data-auth-name>Account</span>
+                <span class="nm-profile-email" data-auth-email></span>
+              </div>
+              <div class="nm-divider"></div>
+              <a href="profile.html" role="menuitem">Account</a>
+              <a href="profile.html" role="menuitem">Profile</a>
+              <a href="profile.html" role="menuitem">Settings</a>
+              <a href="profile.html" role="menuitem">Billing</a>
+              <button type="button" data-auth-logout role="menuitem">Log out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="nm-nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false" data-nav-toggle>
+        Menu
+      </button>
+    </div>
+    <div class="nm-nav-mobile" data-nav-menu>
+      <a href="/">Home</a>
+      <a href="/index.html#product">Product</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="app.html">Studio</a>
+      <div class="nm-nav-mobile-auth">
+        <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
+        <a class="nm-btn nm-btn-primary" href="register.html" data-auth-open="register" data-auth-show="logged-out">Register</a>
+        <a class="nm-btn nm-btn-ghost" href="profile.html" data-auth-show="logged-in" hidden>Account</a>
+        <a class="nm-btn nm-btn-ghost" href="profile.html" data-auth-show="logged-in" hidden>Profile</a>
+        <button class="nm-btn nm-btn-ghost" type="button" data-auth-logout data-auth-show="logged-in" hidden>Log out</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section class="nm-section nm-pricing-hero">
+      <div class="nm-wrap">
+        <div class="nm-pricing-head nm-reveal" data-reveal>
+          <span class="nm-pill">Subscriptions</span>
+          <h1 class="nm-section-title">Choose the right monthly plan for your team.</h1>
+          <p class="nm-section-subtitle">All plans renew monthly and include the full Nomability workflow. Pay with card, Apple Pay, or Google Pay. Invoice support available for EU customers.</p>
+        </div>
+
+        <div class="nm-pricing-grid" style="margin-top: 32px;">
+          <article class="nm-plan-card nm-reveal" data-reveal>
+            <div class="nm-plan-meta">
+              <span class="nm-chip">Starter</span>
+              <h3>10 hours / month</h3>
+            </div>
+            <div class="nm-plan-price">9,99€ <span>/ month</span></div>
+            <ul class="nm-list">
+              <li>10 hours of transcription time</li>
+              <li>Translation, summaries, diarization</li>
+              <li>Exports: TXT, SRT, VTT, JSON</li>
+              <li>Team workspace + audit logs</li>
+            </ul>
+            <button class="nm-btn nm-btn-ghost nm-plan-cta" type="button" data-plan="starter">Subscribe starter</button>
+          </article>
+
+          <article class="nm-plan-card nm-plan-featured nm-reveal" data-reveal style="--reveal-delay: 120ms;">
+            <div class="nm-plan-meta">
+              <span class="nm-chip">Pro</span>
+              <h3>20 hours / month</h3>
+            </div>
+            <div class="nm-plan-price">19,99€ <span>/ month</span></div>
+            <ul class="nm-list">
+              <li>20 hours of transcription time</li>
+              <li>Priority processing queues</li>
+              <li>Multi-speaker diarization</li>
+              <li>Shared team libraries</li>
+            </ul>
+            <button class="nm-btn nm-btn-primary nm-plan-cta" type="button" data-plan="pro">Subscribe pro</button>
+          </article>
+
+          <article class="nm-plan-card nm-reveal" data-reveal style="--reveal-delay: 220ms;">
+            <div class="nm-plan-meta">
+              <span class="nm-chip">Unlimited</span>
+              <h3>Unlimited hours</h3>
+            </div>
+            <div class="nm-plan-price">34,99€ <span>/ month</span></div>
+            <ul class="nm-list">
+              <li>Unlimited transcription hours</li>
+              <li>Dedicated support channel</li>
+              <li>Custom glossary + vocabulary lock</li>
+              <li>Priority roadmap requests</li>
+            </ul>
+            <button class="nm-btn nm-btn-ghost nm-plan-cta" type="button" data-plan="unlimited">Subscribe unlimited</button>
+          </article>
+        </div>
+
+        <div class="nm-compare nm-reveal" data-reveal style="margin-top: 40px;">
+          <div class="nm-compare-head">
+            <span>Compare plans</span>
+            <span>10h</span>
+            <span>20h</span>
+            <span>Unlimited</span>
+          </div>
+          <div class="nm-compare-row">
+            <span>Monthly hours</span>
+            <span>10</span>
+            <span>20</span>
+            <span>Unlimited</span>
+          </div>
+          <div class="nm-compare-row">
+            <span>Translations + summaries</span>
+            <span>Yes</span>
+            <span>Yes</span>
+            <span>Yes</span>
+          </div>
+          <div class="nm-compare-row">
+            <span>Speaker diarization</span>
+            <span>Yes</span>
+            <span>Yes</span>
+            <span>Yes</span>
+          </div>
+          <div class="nm-compare-row">
+            <span>Priority support</span>
+            <span>Standard</span>
+            <span>Priority</span>
+            <span>Dedicated</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="nm-section nm-section-light">
+      <div class="nm-wrap">
+        <div class="nm-panel nm-reveal" data-reveal>
+          <h2>Pick your payment method</h2>
+          <p class="nm-help">After selecting a plan, choose between card (Stripe), PayPal, or invoice on the next step.</p>
+          <a class="nm-btn nm-btn-primary" href="payment-method.html?plan=starter">Choose payment method</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <div class="nm-auth-overlay" data-auth-modal hidden>
+    <div class="nm-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="nm-auth-title">
+      <button class="nm-auth-close" type="button" aria-label="Close" data-auth-close>x</button>
+      <div class="nm-auth-header">
+        <span class="nm-pill">Welcome to Nomability</span>
+        <h2 class="nm-auth-title" id="nm-auth-title">Sign in or create an account</h2>
+      </div>
+      <div class="nm-tabs nm-auth-tabs" role="tablist">
+        <button class="nm-tab active" type="button" data-auth-tab="login" role="tab" aria-selected="true">Login</button>
+        <button class="nm-tab" type="button" data-auth-tab="register" role="tab" aria-selected="false">Register</button>
+      </div>
+      <div class="nm-auth-panel" data-auth-panel="login" role="tabpanel">
+        <form data-auth-form="login" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="auth-login-email">Email</label>
+            <input id="auth-login-email" class="nm-input" type="email" required data-auth-input="login-email" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-login-password">Password</label>
+            <input id="auth-login-password" class="nm-input" type="password" required data-auth-input="login-password" />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Login</button>
+        </form>
+        <p class="nm-help" data-auth-status="login" style="margin-top: 10px;"></p>
+        <div class="nm-auth-footer">
+          <a class="nm-btn nm-btn-ghost" href="magic-link.html">Send magic link</a>
+          <a class="nm-btn nm-btn-ghost" href="reset-password.html">Forgot password</a>
+        </div>
+      </div>
+      <div class="nm-auth-panel" data-auth-panel="register" role="tabpanel" hidden>
+        <form data-auth-form="register" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="auth-register-name">Name</label>
+            <input id="auth-register-name" class="nm-input" type="text" data-auth-input="register-name" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-register-org">Organization</label>
+            <input id="auth-register-org" class="nm-input" type="text" placeholder="Your team or company" data-auth-input="register-org" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-register-email">Email</label>
+            <input id="auth-register-email" class="nm-input" type="email" required data-auth-input="register-email" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-register-password">Password</label>
+            <input id="auth-register-password" class="nm-input" type="password" required data-auth-input="register-password" />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Create account</button>
+        </form>
+        <p class="nm-help" data-auth-status="register" style="margin-top: 10px;"></p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

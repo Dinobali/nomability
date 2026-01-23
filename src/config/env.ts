@@ -37,6 +37,9 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_PRICE_MONTHLY: z.string().optional(),
   STRIPE_PRICE_PAYG: z.string().optional(),
+  STRIPE_PRICE_STARTER_10H: z.string().optional(),
+  STRIPE_PRICE_PRO_20H: z.string().optional(),
+  STRIPE_PRICE_UNLIMITED: z.string().optional(),
   PLAN_INCLUDED_MINUTES: z.coerce.number().default(300),
   PAYG_RATE_CENTS_PER_HOUR: z.coerce.number().default(199),
 
@@ -48,6 +51,11 @@ const envSchema = z.object({
   R2_PUBLIC_BUCKET: z.string().optional(),
   R2_PUBLIC_URL: z.string().optional(),
   LOCAL_STORAGE_PATH: z.string().default('/app/storage'),
+
+  BANK_ACCOUNT_HOLDER: z.string().optional(),
+  BANK_IBAN: z.string().optional(),
+  BANK_BIC: z.string().optional(),
+  BANK_NAME: z.string().optional(),
 
   AI_WORKER_BASE_URL: z.string().default('http://localhost:8008'),
   AI_WORKER_TRANSCRIBE_ENDPOINT: z.string().default('/v1/transcriptions'),

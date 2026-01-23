@@ -226,12 +226,140 @@ export const authRoutes = async (app: FastifyInstance) => {
   });
 
   app.get('/api/auth/me', { preHandler: app.authenticate }, async (req, reply) => {
-    const userId = (req.user as { sub: string }).sub;
+    const { sub: userId, orgId } = req.user as { sub: string; orgId?: string };
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true }
+      select: { id: true, email: true, name: true, createdAt: true }
     });
 
-    return reply.send({ user });
+    const org = orgId
+      ? await prisma.org.findUnique({
+          where: { id: orgId },
+          select: { id: true, name: true, createdAt: true }
+        })
+      : null;
+
+    const membership = orgId
+      ? await prisma.membership.findUnique({
+          where: { userId_orgId: { userId, orgId } },
+          select: { role: true }
+        })
+      : null;
+
+    return reply.send({ user, org, membership });
+  });
+
+  app.patch('/api/auth/me', { preHandler: app.authenticate }, async (req, reply) => {
+    const { sub: userId, orgId } = req.user as { sub: string; orgId?: string };
+    const body = req.body as { name?: string; email?: string; orgName?: string; currentPassword?: string };
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, passwordHash: true }
+    });
+
+    if (!user) {
+      return reply.status(404).send({ error: 'User not found.' });
+    }
+
+    const updates: { name?: string | null; email?: string } = {};
+
+    if (typeof body.name === 'string') {
+      const trimmed = body.name.trim();
+      updates.name = trimmed.length ? trimmed : null;
+    }
+
+    if (typeof body.email === 'string') {
+      const nextEmail = body.email.trim().toLowerCase();
+      if (nextEmail && nextEmail !== user.email) {
+        if (!user.passwordHash) {
+          return reply.status(400).send({ error: 'Password not set. Use password reset to set one.' });
+        }
+        if (!body.currentPassword) {
+          return reply.status(400).send({ error: 'Current password required to change email.' });
+        }
+        const valid = await verifyPassword(body.currentPassword, user.passwordHash);
+        if (!valid) {
+          return reply.status(401).send({ error: 'Invalid password.' });
+        }
+        const existing = await prisma.user.findUnique({ where: { email: nextEmail } });
+        if (existing && existing.id !== userId) {
+          return reply.status(409).send({ error: 'Email already in use.' });
+        }
+        updates.email = nextEmail;
+      }
+    }
+
+    if (Object.keys(updates).length) {
+      await prisma.user.update({
+        where: { id: userId },
+        data: updates
+      });
+    }
+
+    if (orgId && typeof body.orgName === 'string') {
+      const trimmedOrg = body.orgName.trim();
+      if (trimmedOrg) {
+        const membership = await prisma.membership.findUnique({
+          where: { userId_orgId: { userId, orgId } },
+          select: { role: true }
+        });
+        if (membership?.role !== 'owner') {
+          return reply.status(403).send({ error: 'Only owners can update the organization.' });
+        }
+        await prisma.org.update({
+          where: { id: orgId },
+          data: { name: trimmedOrg }
+        });
+      }
+    }
+
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, name: true, createdAt: true }
+    });
+    const updatedOrg = orgId
+      ? await prisma.org.findUnique({
+          where: { id: orgId },
+          select: { id: true, name: true, createdAt: true }
+        })
+      : null;
+
+    return reply.send({ user: updatedUser, org: updatedOrg });
+  });
+
+  app.post('/api/auth/password-change', { preHandler: app.authenticate }, async (req, reply) => {
+    const { sub: userId } = req.user as { sub: string };
+    const body = req.body as { currentPassword?: string; newPassword?: string };
+
+    if (!body.currentPassword || !body.newPassword) {
+      return reply.status(400).send({ error: 'Current password and new password are required.' });
+    }
+
+    if (body.newPassword.length < 8) {
+      return reply.status(400).send({ error: 'Password must be at least 8 characters.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { passwordHash: true }
+    });
+
+    if (!user?.passwordHash) {
+      return reply.status(400).send({ error: 'Password not set. Use password reset to set one.' });
+    }
+
+    const valid = await verifyPassword(body.currentPassword, user.passwordHash);
+    if (!valid) {
+      return reply.status(401).send({ error: 'Invalid password.' });
+    }
+
+    const passwordHash = await hashPassword(body.newPassword);
+    await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash }
+    });
+
+    return reply.send({ ok: true });
   });
 };

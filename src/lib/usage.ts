@@ -1,5 +1,6 @@
 import { prisma } from './db.js';
 import { env } from '../config/env.js';
+import { getIncludedMinutesForPriceId } from './plans.js';
 
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing']);
 
@@ -39,8 +40,11 @@ export const canStartJob = async (orgId: string) => {
   const subscriptionActive = isSubscriptionActive(subscription?.status);
   const usageThisMonth = await getUsageThisMonth(orgId);
   const credits = await getCredits(orgId);
+  const includedMinutes = subscriptionActive
+    ? getIncludedMinutesForPriceId(subscription?.priceId)
+    : 0;
 
-  if (subscriptionActive && usageThisMonth < env.PLAN_INCLUDED_MINUTES) {
+  if (subscriptionActive && usageThisMonth < includedMinutes) {
     return { allowed: true, subscriptionActive, usageThisMonth, credits };
   }
 
@@ -63,8 +67,11 @@ export const applyUsage = async (orgId: string, jobId: string, minutes: number) 
   const subscription = await getSubscription(orgId);
   const subscriptionActive = isSubscriptionActive(subscription?.status);
   const usageThisMonth = await getUsageThisMonth(orgId);
+  const includedMinutes = subscriptionActive
+    ? getIncludedMinutesForPriceId(subscription?.priceId)
+    : 0;
   const includedRemaining = subscriptionActive
-    ? Math.max(env.PLAN_INCLUDED_MINUTES - usageThisMonth, 0)
+    ? Math.max(includedMinutes - usageThisMonth, 0)
     : 0;
 
   let remaining = minutes;

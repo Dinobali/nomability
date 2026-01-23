@@ -5,14 +5,58 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Nomability Admin</title>
   <link rel="stylesheet" href="nomability.css">
+  <script defer src="nomability.js"></script>
+  <script defer src="nomability-auth.js"></script>
 </head>
 <body>
   <header class="nm-header">
     <div class="nm-wrap nm-nav">
       <a class="nm-logo" href="/">Nomability</a>
+      <nav class="nm-nav-links" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/index.html#product">Product</a>
+        <a href="pricing.html">Pricing</a>
+        <a href="app.html">Studio</a>
+      </nav>
       <div class="nm-nav-actions">
-        <a class="nm-btn nm-btn-ghost" href="account.html">Account</a>
-        <button class="nm-btn nm-btn-ghost" id="logout">Logout</button>
+        <a class="nm-btn nm-btn-ghost" href="profile.html">Account</a>
+        <div class="nm-auth-actions">
+          <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
+          <a class="nm-btn nm-btn-primary" href="register.html" data-auth-open="register" data-auth-show="logged-out">Register</a>
+          <div class="nm-profile" data-auth-profile data-auth-show="logged-in" hidden>
+            <button class="nm-avatar" type="button" data-auth-avatar aria-haspopup="menu" aria-expanded="false">
+              <span data-auth-initials>U</span>
+            </button>
+            <div class="nm-profile-menu" data-auth-menu role="menu" hidden>
+              <div class="nm-profile-meta">
+                <span class="nm-profile-name" data-auth-name>Account</span>
+                <span class="nm-profile-email" data-auth-email></span>
+              </div>
+              <div class="nm-divider"></div>
+              <a href="profile.html" role="menuitem">Account</a>
+              <a href="profile.html" role="menuitem">Profile</a>
+              <a href="profile.html" role="menuitem">Settings</a>
+              <a href="profile.html" role="menuitem">Billing</a>
+              <button type="button" id="logout" data-auth-logout role="menuitem">Log out</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="nm-nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false" data-nav-toggle>
+        Menu
+      </button>
+    </div>
+    <div class="nm-nav-mobile" data-nav-menu>
+      <a href="/">Home</a>
+      <a href="/index.html#product">Product</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="profile.html">Account</a>
+      <div class="nm-nav-mobile-auth">
+        <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
+        <a class="nm-btn nm-btn-primary" href="register.html" data-auth-open="register" data-auth-show="logged-out">Register</a>
+        <a class="nm-btn nm-btn-ghost" href="profile.html" data-auth-show="logged-in" hidden>Account</a>
+        <a class="nm-btn nm-btn-ghost" href="profile.html" data-auth-show="logged-in" hidden>Profile</a>
+        <button class="nm-btn nm-btn-ghost" type="button" data-auth-logout data-auth-show="logged-in" hidden>Log out</button>
       </div>
     </div>
   </header>
@@ -111,9 +155,11 @@
       loadMembers();
     });
 
-    document.getElementById('logout').addEventListener('click', () => {
-      localStorage.removeItem('nmAuthToken');
-      window.location.href = 'login.html';
+    document.querySelectorAll('[data-auth-logout]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        localStorage.removeItem('nmAuthToken');
+        window.location.href = 'login.html';
+      });
     });
 
     loadMembers();
