@@ -1,0 +1,146 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String?
+  name         String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  memberships  Membership[]
+  jobs         Job[]
+  magicLinks   MagicLinkToken[]
+  resetTokens  PasswordResetToken[]
+}
+
+model Org {
+  id          String       @id @default(uuid())
+  name        String
+  overLimit   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  memberships Membership[]
+  jobs        Job[]
+  customer    StripeCustomer?
+  subscription Subscription?
+  creditBalance CreditBalance?
+  usage       UsageRecord[]
+}
+
+model Membership {
+  id        String   @id @default(uuid())
+  userId    String
+  orgId     String
+  role      String   @default("member")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, orgId])
+}
+
+model Job {
+  id         String   @id @default(uuid())
+  orgId      String?
+  userId     String?
+  status     String   @default("queued")
+  progress   Int      @default(0)
+  tasks      Json?
+  params     Json?
+  result     Json?
+  error      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  org   Org?  @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  user  User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  files File[]
+  usage UsageRecord?
+}
+
+model File {
+  id           String   @id @default(uuid())
+  jobId        String
+  originalName String
+  mimeType     String
+  sizeBytes    Int?
+  r2Key        String
+  bucket       String   @default("private")
+  createdAt    DateTime @default(now())
+
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model MagicLinkToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StripeCustomer {
+  id               String   @id @default(uuid())
+  orgId            String   @unique
+  stripeCustomerId String
+  createdAt        DateTime @default(now())
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id                    String   @id @default(uuid())
+  orgId                 String   @unique
+  stripeSubscriptionId  String
+  priceId               String?
+  status                String
+  currentPeriodEnd      DateTime?
+  createdAt             DateTime @default(now())
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}
+
+model UsageRecord {
+  id          String   @id @default(uuid())
+  orgId       String
+  jobId       String?  @unique
+  minutes     Float   @default(0)
+  amountCents Int?
+  createdAt   DateTime @default(now())
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  job Job? @relation(fields: [jobId], references: [id], onDelete: SetNull)
+}
+
+model CreditBalance {
+  id              String   @id @default(uuid())
+  orgId           String   @unique
+  minutesRemaining Float   @default(0)
+  updatedAt       DateTime @updatedAt
+
+  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
+}

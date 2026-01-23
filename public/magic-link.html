@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomability Magic Link</title>
+  <link rel="stylesheet" href="nomability.css">
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <div class="nm-nav-actions">
+        <a class="nm-btn nm-btn-ghost" href="login.html">Sign in</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="nm-app-shell">
+    <div class="nm-wrap nm-app-grid">
+      <section class="nm-panel">
+        <h2>Magic link</h2>
+        <form id="magic-form" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="email">Email</label>
+            <input id="email" class="nm-input" type="email" required />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Send magic link</button>
+        </form>
+        <p id="magic-status" class="nm-help" style="margin-top: 12px;"></p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const statusEl = document.getElementById('magic-status');
+    const form = document.getElementById('magic-form');
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const redirectTo = params.get('redirect') || 'app.html';
+
+    const verifyToken = async () => {
+      statusEl.textContent = 'Verifying magic link...';
+      const response = await fetch(`/api/auth/magic-link/verify?token=${encodeURIComponent(token)}`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        statusEl.textContent = data.error || 'Magic link invalid or expired.';
+        return;
+      }
+      localStorage.setItem('nmAuthToken', data.token);
+      window.location.href = redirectTo;
+    };
+
+    if (token) {
+      verifyToken();
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      statusEl.textContent = 'Sending magic link...';
+      const email = document.getElementById('email').value.trim();
+      const response = await fetch('/api/auth/magic-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        statusEl.textContent = data.error || 'Failed to send magic link.';
+        return;
+      }
+      statusEl.textContent = 'Check your inbox for the magic link.';
+    });
+  </script>
+</body>
+</html>

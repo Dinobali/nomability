@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en" x-data="{ darkMode: localStorage.getItem('darkMode') === 'true' }" :class="{ 'dark': darkMode }">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<!-- Added meta description -->
+    <meta name="description" content="FastWhisperAPI Transcription tool - Live transcription, voice recorder and more.">
+    <title>FastWhisperAPI Transcription</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/alpinejs/3.10.5/cdn.min.js" defer></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            safelist: [
+                'dark'
+            ]
+        }
+    </script>
+    <link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.5.1"></script>
+    <link rel="icon" href="data:,">
+    <style>
+        .fade-enter { opacity: 0; }
+        .fade-enter-active { transition: opacity 200ms ease-in; }
+        .fade-exit { opacity: 1; }
+        .fade-exit-active { opacity: 0; transition: opacity 200ms ease-out; }
+        
+        .dropzone { border: 2px dashed #ccc; }
+        .dropzone.dragover { border-color: #4f46e5; background: rgba(79, 70, 229, 0.1); }
+        
+        .tooltip {
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            z-index: 50;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-gray-900 min-h-screen transition-colors duration-200" 
+      x-data="transcriptionApp()"
+      @keydown.ctrl.k.window.prevent="toggleHelp"
+      @keydown.escape.window="closeAllModals">
+    
+    <!-- Header and Settings Menu -->
+    <header class="bg-white dark:bg-gray-800 shadow-sm">
+        <div class="container mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-2xl font-bold text-blue-600 dark:text-blue-400">FastWhisperAPI</h1>
+            
+            <div class="flex items-center space-x-4">
+                <button @click="toggleHelp" 
+                        aria-label="Show Help (Ctrl+K)"
+                        class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                        x-tooltip="'Show Help (Ctrl+K)'">
+                    <i data-lucide="help-circle" class="w-5 h-5"></i>
+                </button>
+                
+                <button @click="toggleSettings" 
+                        aria-label="Settings"
+                        class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700"
+                        x-tooltip="'Settings'">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                </button>
+                
+                <button @click="$store.darkMode.toggle()" 
+                        aria-label="Toggle Dark Mode"
+                        class="p-2 rounded-lg bg-gray-200 dark:bg-gray-700"
+                        x-tooltip="'Toggle Dark Mode'">
+                    <i data-lucide="sun" class="w-5 h-5 dark:hidden"></i>
+                    <i data-lucide="moon" class="w-5 h-5 hidden dark:block"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8 text-center text-blue-600 dark:text-blue-400">FastWhisperAPI Transcription</h1>
+        
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 flex items-center text-gray-900 dark:text-gray-100">
+                <i data-lucide="settings" class="w-6 h-6 mr-2"></i>
+                Transcription Settings
+            </h2>
+            <form @submit.prevent="transcribe" class="space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <!-- Changed id from "file" to "audioFile" -->
+                        <label for="audioFile" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audio File(s)</label>
+                        <input type="file" id="audioFile" @change="handleFileChange" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.opus,.flac,.ogg" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300" multiple>
+                    </div>
+                    <div>
+                        <label for="model" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model</label>
+                        <select id="model" x-model="model" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                            <option value="tiny.en">tiny.en</option>
+                            <option value="tiny">tiny</option>
+                            <option value="base.en">base.en</option>
+                            <option value="base" selected>base</option>
+                            <option value="small.en">small.en</option>
+                            <option value="small">small</option>
+                            <option value="medium.en">medium.en</option>
+                            <option value="medium">medium</option>
+                            <option value="large-v1">large-v1</option>
+                            <option value="large-v2">large-v2</option>
+                            <option value="large-v3">large-v3</option>
+                            <option value="large">large</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="language" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language (ISO-639-1)</label>
+                        <input type="text" id="language" x-model="language" placeholder="e.g., en, de, fr" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                    </div>
+                    <div>
+                        <label for="initial_prompt" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Initial Prompt</label>
+                        <input type="text" id="initial_prompt" x-model="initial_prompt" placeholder="Optional initial prompt" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                    </div>
+                    <div>
+                        <label for="response_format" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Response Format</label>
+                        <select id="response_format" x-model="response_format" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                            <option value="text">Text</option>
+                            <option value="verbose_json">Verbose JSON</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="timestamp_granularities" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Timestamp Granularities</label>
+                        <select id="timestamp_granularities" x-model="timestamp_granularities" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                            <option value="segment">Segment</option>
+                            <option value="word">Word</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" id="include_timestamps" x-model="include_timestamps" class="mr-2">
+                        <label for="include_timestamps" class="text-sm font-medium text-gray-700 dark:text-gray-300">Include Timestamps</label>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center">
+                        <input type="checkbox" id="vad_filter" x-model="vad_filter" class="mr-2">
+                        <label for="vad_filter" class="text-sm font-medium text-gray-700 dark:text-gray-300">VAD Filter</label>
+                    </div>
+                    <div>
+                        <label for="min_silence_duration_ms" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Min Silence Duration (ms)</label>
+                        <input type="number" id="min_silence_duration_ms" x-model="min_silence_duration_ms" min="0" class="w-32 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300">
+                    </div>
+                </div>
+                <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-300 flex items-center">
+                    <i data-lucide="mic" class="w-5 h-5 mr-2"></i>
+                    Transcribe
+                </button>
+            </form>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 flex items-center text-gray-900 dark:text-gray-100">
+                <i data-lucide="mic" class="w-6 h-6 mr-2"></i>
+                Live Dictation
+            </h2>
+            <div class="space-y-4">
+                <div class="flex items-center space-x-4">
+                    <button @click="startDictation" x-show="!isRecording" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 flex items-center">
+                        <i data-lucide="mic" class="w-5 h-5 mr-2"></i>
+                        Start Recording
+                    </button>
+                    <button @click="stopDictation" x-show="isRecording" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition duration-300 flex items-center">
+                        <i data-lucide="mic-off" class="w-5 h-5 mr-2"></i>
+                        Stop Recording
+                    </button>
+                    <span x-show="isRecording" class="text-red-500 animate-pulse">Recording...</span>
+                </div>
+                <div x-show="liveDictationText" class="bg-gray-100 dark:bg-gray-700 p-4 rounded-md">
+                    <h3 class="font-semibold mb-2 text-gray-900 dark:text-gray-100">Live Transcription:</h3>
+                    <p x-text="liveDictationText" class="text-gray-700 dark:text-gray-300"></p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-8">
+            <h2 class="text-xl font-semibold mb-4 flex items-center text-gray-900 dark:text-gray-100">
+                <i data-lucide="mic" class="w-6 h-6 mr-2"></i>
+                Voice Recorder
+            </h2>
+            <div class="space-y-4">
+                <div class="flex flex-col space-y-4">
+                    <div class="flex items-center space-x-4">
+                        <button 
+                            @click="toggleVoiceRecorder" 
+                            :class="isVoiceRecording ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'"
+                            class="text-white px-4 py-2 rounded-md transition duration-300 flex items-center">
+                            <i data-lucide="mic" class="w-5 h-5 mr-2" x-show="!isVoiceRecording"></i>
+                            <i data-lucide="mic-off" class="w-5 h-5 mr-2" x-show="isVoiceRecording"></i>
+                            <span x-text="isVoiceRecording ? 'Stop Recording' : 'Start Recording'"></span>
+                        </button>
+                        <div x-show="isVoiceRecording" class="flex items-center space-x-2">
+                            <span class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                            <span class="text-red-500 font-medium" x-text="recordingTime"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="text-sm text-gray-600 dark:text-gray-300" x-show="!isVoiceRecording && !audioURL">
+                        Click "Start Recording" to begin recording your voice. Click "Stop Recording" when finished.
+                    </div>
+
+                    <div x-show="audioURL" class="border rounded-lg p-4 bg-gray-50 dark:bg-gray-700">
+                        <div class="mb-3">
+                            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preview Recording:</h3>
+                            <audio :src="audioURL" controls class="w-full"></audio>
+                        </div>
+                        <div class="flex space-x-3">
+                            <button @click="sendVoiceRecording" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 flex items-center">
+                                <i data-lucide="send" class="w-5 h-5 mr-2"></i>
+                                Transcribe Recording
+                            </button>
+                            <button @click="downloadRecording" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-300 flex items-center">
+                                <i data-lucide="download" class="w-5 h-5 mr-2"></i>
+                                Download Recording
+                            </button>
+                            <button @click="discardRecording" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-300 flex items-center">
+                                <i data-lucide="trash-2" class="w-5 h-5 mr-2"></i>
+                                Discard
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div x-show="isLoading" class="text-center my-8">
+            <i data-lucide="loader" class="w-8 h-8 animate-spin inline-block"></i>
+            <p class="mt-2 text-gray-600 dark:text-gray-300">Transcribing... Please wait.</p>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 mb-4 mt-4">
+                <div class="bg-blue-600 h-2.5 rounded-full" :style="`width: ${progress}%`"></div>
+            </div>
+            <p x-text="`Progress: ${progress}%`" class="text-sm text-gray-600 dark:text-gray-300"></p>
+        </div>
+        
+        <div x-show="transcription" class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6">
+            <h2 class="text-xl font-semibold mb-4 flex items-center text-gray-900 dark:text-gray-100">
+                <i data-lucide="file-text" class="w-6 h-6 mr-2"></i>
+                Transcription Result
+            </h2>
+            <pre x-text="transcription" class="bg-gray-100 dark:bg-gray-700 p-4 rounded-md whitespace-pre-wrap text-gray-700 dark:text-gray-300"></pre>
+            <div class="mt-4 flex space-x-4">
+                <button @click="saveAsFile('txt')" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 flex items-center">
+                    <i data-lucide="file-text" class="w-5 h-5 mr-2"></i>
+                    Save as TXT
+                </button>
+                <button @click="saveAsFile('json')" x-show="response_format === 'verbose_json'" class="bg-purple-500 text-white px-4 py-2 rounded-md hover:bg-purple-600 transition duration-300 flex items-center">
+                    <i data-lucide="file-json" class="w-5 h-5 mr-2"></i>
+                    Save as JSON
+                </button>
+            </div>
+        </div>
+        
+        <div x-show="error" class="bg-red-100 dark:bg-red-900 border-l-4 border-red-500 text-red-700 dark:text-red-300 p-4 my-8" role="alert">
+            <p class="font-bold">Error</p>
+            <p x-text="error"></p>
+        </div>
+
+        <!-- Help Modal -->
+        <div x-show="showHelp" 
+             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+             @click.self="showHelp = false">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+                <h2 class="text-2xl font-bold mb-4">Keyboard Shortcuts</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <h3 class="font-medium mb-2">General</h3>
+                        <ul class="space-y-2">
+                            <li><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">Ctrl+K</kbd> Show/Hide Help</li>
+                            <li><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">Esc</kbd> Close Modals</li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="font-medium mb-2">Recording</h3>
+                        <ul class="space-y-2">
+                            <li><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">Ctrl+R</kbd> Start/Stop Recording</li>
+                            <li><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded">Ctrl+S</kbd> Save Recording</li>
+                        </ul>
+                    </div>
+                </div>
+                <button @click="showHelp = false" class="mt-6 bg-blue-500 text-white px-4 py-2 rounded-md">Close</button>
+            </div>
+        </div>
+        
+        <!-- Settings Modal -->
+        <div x-show="showSettings"
+             class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center"
+             @click.self="showSettings = false">
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-2xl w-full mx-4">
+                <h2 class="text-2xl font-bold mb-4">Settings</h2>
+                
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-1">API Endpoint</label>
+                        <input type="text" x-model="apiEndpoint" 
+                               class="w-full p-2 border rounded-md dark:bg-gray-700">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Default Model</label>
+                        <select x-model="defaultModel" 
+                                class="w-full p-2 border rounded-md dark:bg-gray-700">
+                            <option value="base">base</option>
+                            <option value="small">small</option>
+                            <option value="medium">medium</option>
+                            <option value="large">large</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Default Language</label>
+                        <input type="text" x-model="defaultLanguage" 
+                               class="w-full p-2 border rounded-md dark:bg-gray-700"
+                               placeholder="e.g., en">
+                    </div>
+
+                    <div class="flex items-center">
+                        <input type="checkbox" id="defaultIncludeTimestamps" 
+                               x-model="defaultIncludeTimestamps" 
+                               class="rounded border-gray-300 dark:border-gray-600">
+                        <label for="defaultIncludeTimestamps" 
+                               class="ml-2 block text-sm font-medium">Include Timestamps by Default</label>
+                    </div>
+                </div>
+                
+                <div class="mt-6 flex justify-end space-x-4">
+                    <button @click="saveSettings" 
+                            class="bg-blue-500 text-white px-4 py-2 rounded-md">Save</button>
+                    <button @click="showSettings = false" 
+                            class="bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded-md">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('alpine:init', () => {
+            Alpine.store('darkMode', {
+                isEnabled: localStorage.getItem('darkMode') === 'true',
+                toggle() {
+                    this.isEnabled = !this.isEnabled;
+                    localStorage.setItem('darkMode', this.isEnabled);
+                    document.documentElement.classList.toggle('dark', this.isEnabled);
+                },
+                init() {
+                    if (this.isEnabled) {
+                        document.documentElement.classList.add('dark');
+                    }
+                    // Check system preference if no preference is stored
+                    if (localStorage.getItem('darkMode') === null) {
+                        this.isEnabled = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                        document.documentElement.classList.toggle('dark', this.isEnabled);
+                    }
+                }
+            });
+        });
+
+        function transcriptionApp() {
+            return {
+                file: null,
+                model: 'base',
+                language: '',
+                initial_prompt: '',
+                vad_filter: false,
+                min_silence_duration_ms: 1000,
+                response_format: 'verbose_json',
+                timestamp_granularities: 'word',
+                include_timestamps: true,
+                isLoading: false,
+                transcription: '',
+                error: '',
+                progress: 0,
+                isRecording: false,
+                liveDictationText: '',
+                mediaRecorder: null,
+                audioChunks: [],
+                audioURL: null,
+                recordingTime: '00:00',
+                recordingInterval: null,
+                recordingStartTime: null,
+                isVoiceRecording: false,
+                showHelp: false,
+                showSettings: false,
+                files: [],
+                apiEndpoint: localStorage.getItem('apiEndpoint') || 'http://192.168.178.122:8008',
+                defaultModel: localStorage.getItem('defaultModel') || 'base',
+                defaultLanguage: localStorage.getItem('defaultLanguage') || '',
+                defaultIncludeTimestamps: localStorage.getItem('defaultIncludeTimestamps') === 'true',
+
+                handleFileChange(event) {
+                    this.file = event.target.files;
+                },
+                
+                async transcribe() {
+                    if (!this.file || this.file.length === 0) {
+                        this.error = "Please select at least one audio file.";
+                        return;
+                    }
+                    
+                    // Validate API endpoint
+                    try {
+                        new URL(this.apiEndpoint);
+                    } catch (e) {
+                        this.error = "Invalid API endpoint URL";
+                        return;
+                    }
+
+                    this.isLoading = true;
+                    this.transcription = "";
+                    this.error = "";
+                    this.progress = 0;
+                    
+                    const formData = new FormData();
+                    for (let i = 0; i < this.file.length; i++) {
+                        formData.append("file", this.file[i]);
+                    }
+                    formData.append('model', this.model);
+                    if (this.language) formData.append('language', this.language);
+                    if (this.initial_prompt) formData.append('initial_prompt', this.initial_prompt);
+                    formData.append('vad_filter', String(this.vad_filter));
+                    formData.append('min_silence_duration_ms', String(this.min_silence_duration_ms));
+                    formData.append('response_format', this.response_format);
+                    formData.append('timestamp_granularities', this.timestamp_granularities);
+                    
+                    try {
+                        const response = await fetch(`${this.apiEndpoint}/v1/transcriptions`, {
+                            method: "POST",
+                            body: formData,
+                            headers: {
+                                "Accept": "application/json",
+                            }
+                        });
+                        
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                        }
+                        
+                        const reader = response.body.getReader();
+                        const decoder = new TextDecoder();
+                        let result = '';
+                        
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            if (done) break;
+                            
+                            const chunk = decoder.decode(value, { stream: true });
+                            result += chunk;
+                            
+                            try {
+                                const parsedChunk = JSON.parse(chunk);
+                                if (parsedChunk.progress) {
+                                    this.progress = parsedChunk.progress;
+                                }
+                            } catch (e) {
+                                // Not a progress update, continue
+                            }
+                        }
+                        
+                        if (this.response_format === 'verbose_json') {
+                            const parsedResult = JSON.parse(result);
+                            this.transcription = this.formatTranscription(parsedResult);
+                        } else {
+                            this.transcription = result;
+                        }
+                    } catch (e) {
+                        this.error = `An error occurred: ${e.message}`;
+                    } finally {
+                        this.isLoading = false;
+                        this.progress = 100;
+                    }
+                },
+                
+                formatTranscription(data) {
+                    let formattedText = '';
+                    let currentSentence = '';
+                    let sentenceStart = null;
+                    
+                    data.segments.forEach((segment, index) => {
+                        segment.words.forEach(word => {
+                            if (sentenceStart === null) {
+                                sentenceStart = word.start;
+                            }
+                            
+                            currentSentence += word.word + ' ';
+                            
+                            if (word.word.match(/[.!?]$/)) {
+                                if (this.include_timestamps) {
+                                    formattedText += `[${sentenceStart.toFixed(2)}s -> ${word.end.toFixed(2)}s] `;
+                                }
+                                formattedText += `${currentSentence.trim()}\n`;
+                                currentSentence = '';
+                                sentenceStart = null;
+                            }
+                        });
+                        
+                        // Handle case where segment ends without punctuation
+                        if (currentSentence !== '' && index === data.segments.length - 1) {
+                            if (this.include_timestamps) {
+                                formattedText += `[${sentenceStart.toFixed(2)}s -> ${segment.words[segment.words.length - 1].end.toFixed(2)}s] `;
+                            }
+                            formattedText += `${currentSentence.trim()}\n`;
+                        }
+                    });
+                    
+                    return formattedText;
+                },
+                
+                saveAsFile(format) {
+                    let content, filename, type;
+                    if (format === 'txt') {
+                        content = this.transcription;
+                        filename = 'transcription.txt';
+                        type = 'text/plain';
+                    } else {
+                        content = JSON.stringify(JSON.parse(this.transcription), null, 2);
+                        filename = 'transcription.json';
+                        type = 'application/json';
+                    }
+                    
+                    const blob = new Blob([content], { type });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                },
+
+                async startDictation() {
+                    this.error = ''; // Clear any previous errors
+                    
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        this.error = 'Your browser does not support audio recording. Please try using a modern browser like Chrome, Firefox, or Edge.';
+                        return;
+                    }
+
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        this.isRecording = true;
+                        this.mediaRecorder = new MediaRecorder(stream);
+                        this.audioChunks = [];
+
+                        this.mediaRecorder.ondataavailable = (event) => {
+                            this.audioChunks.push(event.data);
+                        };
+
+                        this.mediaRecorder.onstop = () => {
+                            const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                            this.transcribeLiveAudio(audioBlob);
+                        };
+
+                        this.mediaRecorder.start(1000); // Collect data every second
+                    } catch (error) {
+                        if (error.name === 'NotAllowedError') {
+                            this.error = 'Microphone access was denied. Please allow microphone access and try again.';
+                        } else if (error.name === 'NotFoundError') {
+                            this.error = 'No microphone was found. Please check your audio input devices and try again.';
+                        } else {
+                            this.error = `Error accessing microphone: ${error.message}`;
+                        }
+                        console.error('Microphone access error:', error);
+                    }
+                },
+
+                stopDictation() {
+                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
+                        this.mediaRecorder.stop();
+                        this.isRecording = false;
+                    }
+                },
+
+                async transcribeLiveAudio(audioBlob) {
+                    const formData = new FormData();
+                    // Append as array of files to match the API expectation
+                    formData.append('file', audioBlob, 'live_audio.wav');
+                    formData.append('model', this.model);
+                    if (this.language) formData.append('language', this.language);
+                    if (this.initial_prompt) formData.append('initial_prompt', this.initial_prompt);
+                    formData.append('vad_filter', String(this.vad_filter));
+                    formData.append('min_silence_duration_ms', String(this.min_silence_duration_ms));
+                    formData.append('response_format', 'verbose_json');
+                    formData.append('timestamp_granularities', 'word');
+
+                    try {
+                        const response = await fetch(`${this.apiEndpoint}/v1/transcriptions`, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'Accept': 'application/json',
+                            }
+                        });
+
+                        if (!response.ok) {
+                            const errorText = await response.text();
+                            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+                        }
+
+                        const result = await response.text();
+                        // Validate that the response is valid JSON before parsing
+                        try {
+                            const parsedResult = JSON.parse(result);
+                            const formattedTranscription = this.formatTranscription(parsedResult);
+                            this.liveDictationText += formattedTranscription;
+                        } catch (e) {
+                            throw new Error('Invalid JSON response from server');
+                        }
+                    } catch (e) {
+                        this.error = `Error transcribing live audio: ${e.message}`;
+                        console.error('Transcription error:', e);
+                    }
+                },
+
+                toggleVoiceRecorder() {
+                    if (this.isVoiceRecording) {
+                        this.stopVoiceRecording();
+                    } else {
+                        this.startVoiceRecording();
+                    }
+                },
+
+                async startVoiceRecording() {
+                    if (this.isRecording) return; // Don't start if live dictation is running
+                    
+                    try {
+                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        this.isVoiceRecording = true;
+                        this.mediaRecorder = new MediaRecorder(stream, {
+                            mimeType: 'audio/webm;codecs=opus'
+                        });
+                        this.audioChunks = [];
+                        this.recordingStartTime = Date.now();
+                        
+                        this.recordingInterval = setInterval(() => {
+                            const seconds = Math.floor((Date.now() - this.recordingStartTime) / 1000);
+                            const minutes = Math.floor(seconds / 60);
+                            const remainingSeconds = seconds % 60;
+                            this.recordingTime = `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+                        }, 1000);
+
+                        this.mediaRecorder.ondataavailable = (event) => {
+                            this.audioChunks.push(event.data);
+                        };
+
+                        this.mediaRecorder.onstop = () => {
+                            const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                            this.audioURL = URL.createObjectURL(audioBlob);
+                            clearInterval(this.recordingInterval);
+                        };
+
+                        this.mediaRecorder.start();
+                    } catch (error) {
+                        this.error = `Microphone access error: ${error.message}`;
+                        console.error('Microphone error:', error);
+                    }
+                },
+
+                stopVoiceRecording() {
+                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive' && this.isVoiceRecording) {
+                        this.mediaRecorder.stop();
+                        this.mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                        this.isVoiceRecording = false;
+                    }
+                },
+
+                discardRecording() {
+                    if (this.audioURL) {
+                        URL.revokeObjectURL(this.audioURL);
+                    }
+                    this.audioURL = null;
+                    this.audioChunks = [];
+                    this.recordingTime = '00:00';
+                },
+
+                async sendVoiceRecording() {
+                    if (!this.audioChunks.length) return;
+                    
+                    const audioBlob = new Blob(this.audioChunks, { type: "audio/webm" });
+                    const formData = new FormData();
+                    formData.append("file", audioBlob, "recording.webm");
+                    formData.append('model', this.model);
+                    if (this.language) formData.append('language', this.language);
+                    if (this.initial_prompt) formData.append('initial_prompt', this.initial_prompt);
+                    formData.append('vad_filter', String(this.vad_filter));
+                    formData.append('min_silence_duration_ms', String(this.min_silence_duration_ms));
+                    formData.append('response_format', this.response_format);
+                    formData.append('timestamp_granularities', this.timestamp_granularities);
+
+                    this.isLoading = true;
+                    this.error = '';
+                    this.progress = 0;
+
+                    try {
+                        const response = await fetch(`${this.apiEndpoint}/v1/transcriptions`, {
+                            method: "POST",
+                            body: formData
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.text();
+                        if (this.response_format === 'verbose_json') {
+                            const parsedResult = JSON.parse(result);
+                            this.transcription = this.formatTranscription(parsedResult);
+                        } else {
+                            this.transcription = result;
+                        }
+
+                        // Clear recording state
+                        this.discardRecording();
+                    } catch (error) {
+                        this.error = `Failed to transcribe: ${error.message}`;
+                    } finally {
+                        this.isLoading = false;
+                        this.progress = 100;
+                    }
+                },
+
+                downloadRecording() {
+                    if (!this.audioURL || !this.audioChunks.length) return;
+                    
+                    const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
+                    const url = URL.createObjectURL(audioBlob);
+                    const a = document.createElement('a');
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                    a.href = url;
+                    a.download = `recording-${timestamp}.wav`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                },
+
+                init() {
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        console.warn('Audio recording is not supported in this browser');
+                    }
+                    
+                    // Initialize dark mode store
+                    Alpine.store('darkMode').init();
+                    
+                    // Initialize settings
+                    this.include_timestamps = this.defaultIncludeTimestamps;
+                    
+                    this.initTooltips();
+                },
+
+                toggleHelp() {
+                    this.showHelp = !this.showHelp;
+                },
+                
+                toggleSettings() {
+                    this.showSettings = !this.showSettings;
+                },
+                
+                closeAllModals() {
+                    this.showHelp = false;
+                    this.showSettings = false;
+                },
+                
+                saveSettings() {
+                    localStorage.setItem('apiEndpoint', this.apiEndpoint);
+                    localStorage.setItem('defaultModel', this.defaultModel);
+                    localStorage.setItem('defaultLanguage', this.defaultLanguage);
+                    localStorage.setItem('defaultIncludeTimestamps', this.defaultIncludeTimestamps);
+                    this.include_timestamps = this.defaultIncludeTimestamps;
+                    this.showSettings = false;
+                    this.showNotification('Settings saved successfully');
+                },
+                
+                handleDragOver(e) {
+                    e.target.classList.add('dragover');
+                },
+                
+                handleDragLeave(e) {
+                    e.target.classList.remove('dragover');
+                },
+                
+                handleDrop(e) {
+                    e.target.classList.remove('dragover');
+                    const droppedFiles = Array.from(e.dataTransfer.files).filter(
+                        file => file.type.startsWith('audio/')
+                    );
+                    this.files = [...this.files, ...droppedFiles];
+                },
+                
+                removeFile(index) {
+                    this.files.splice(index, 1);
+                },
+                
+                showNotification(message, type = 'success') {
+                    Toastify({
+                        text: message,
+                        duration: 3000,
+                        gravity: 'top',
+                        position: 'right',
+                        backgroundColor: type === 'success' ? '#10B981' : '#EF4444'
+                    }).showToast();
+                },
+                
+                initTooltips() {
+                    document.querySelectorAll('[x-tooltip]').forEach(el => {
+                        const tooltip = document.createElement('div');
+                        tooltip.className = 'tooltip';
+                        tooltip.textContent = el.getAttribute('x-tooltip');
+                        
+                        el.addEventListener('mouseenter', () => {
+                            document.body.appendChild(tooltip);
+                            computePosition(el, tooltip, {
+                                placement: 'top',
+                                middleware: [offset(6), shift(), flip()]
+                            }).then(({x, y}) => {
+                                Object.assign(tooltip.style, {
+                                    left: `${x}px`,
+                                    top: `${y}px`
+                                });
+                            });
+                        });
+                        
+                        el.addEventListener('mouseleave', () => {
+                            tooltip.remove();
+                        });
+                    });
+                }
+            }
+        }
+
+        lucide.createIcons();
+    </script>
+</body>
+</html>

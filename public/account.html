@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomability Account</title>
+  <link rel="stylesheet" href="nomability.css">
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <div class="nm-nav-actions">
+        <a class="nm-btn nm-btn-ghost" href="app.html">Studio</a>
+        <button class="nm-btn nm-btn-ghost" id="logout">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="nm-app-shell">
+    <div class="nm-wrap nm-app-grid">
+      <section class="nm-panel">
+        <h2>Account</h2>
+        <div id="account-info" class="nm-help">Loading account...</div>
+        <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <button class="nm-btn nm-btn-primary" id="portal-btn">Open billing portal</button>
+          <button class="nm-btn nm-btn-primary" id="payg-btn">Buy PAYG hours</button>
+          <button class="nm-btn nm-btn-ghost" id="refresh-btn">Refresh invoices</button>
+        </div>
+        <div style="margin-top: 14px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+          <label class="nm-field" style="min-width: 160px;">
+            <span style="font-size: 0.8rem; color: var(--nm-muted);">PAYG hours</span>
+            <input id="payg-hours" class="nm-input" type="number" min="1" value="1" />
+          </label>
+        </div>
+      </section>
+      <section class="nm-panel">
+        <h2>Usage</h2>
+        <div id="usage-info" class="nm-help">Loading usage...</div>
+      </section>
+      <section class="nm-panel">
+        <h2>Invoices</h2>
+        <div id="invoice-list" class="nm-help">Loading invoices...</div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const token = localStorage.getItem('nmAuthToken');
+    if (!token) {
+      window.location.href = 'login.html?redirect=account.html';
+    }
+
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const accountInfo = document.getElementById('account-info');
+    const usageInfo = document.getElementById('usage-info');
+    const invoiceList = document.getElementById('invoice-list');
+
+    const loadAccount = async () => {
+      const response = await fetch('/api/auth/me', { headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        accountInfo.textContent = data.error || 'Failed to load account.';
+        return;
+      }
+      accountInfo.textContent = `Signed in as ${data.user.email}`;
+    };
+
+    const loadUsage = async () => {
+      const response = await fetch('/api/billing/status', { headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        usageInfo.textContent = data.error || 'Failed to load usage.';
+        return;
+      }
+      const subscriptionStatus = data.subscription?.status || 'none';
+      const currentPeriodEnd = data.subscription?.currentPeriodEnd
+        ? new Date(data.subscription.currentPeriodEnd).toLocaleDateString()
+        : 'n/a';
+      const used = (data.usageThisMonth || 0).toFixed(1);
+      const included = data.includedMinutes || 0;
+      usageInfo.innerHTML = `Subscription: ${subscriptionStatus}<br/>Current period ends: ${currentPeriodEnd}<br/>Included minutes: ${included}<br/>Used this month: ${used}<br/>Credits available: ${data.credits || 0} minutes`;
+    };
+
+    const loadInvoices = async () => {
+      const response = await fetch('/api/billing/invoices', { headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        invoiceList.textContent = data.error || 'Failed to load invoices.';
+        return;
+      }
+      if (!data.invoices?.length) {
+        invoiceList.textContent = 'No invoices yet.';
+        return;
+      }
+      invoiceList.innerHTML = data.invoices
+        .map((invoice) => {
+          const amount = (invoice.amount_paid || invoice.amount_due || 0) / 100;
+          const pdfLink = invoice.invoice_pdf ? `<a href="${invoice.invoice_pdf}" target="_blank" rel="noopener">Download PDF</a>` : '';
+          const hostedLink = invoice.hosted_invoice_url ? `<a href="${invoice.hosted_invoice_url}" target="_blank" rel="noopener">View</a>` : '';
+          const links = [hostedLink, pdfLink].filter(Boolean).join(' · ');
+          return `<div style="margin-bottom: 10px;">${invoice.number || invoice.id} — €${amount.toFixed(2)} — ${invoice.status}<div style="margin-top: 6px; font-size: 0.85rem; color: var(--nm-muted);">${links}</div></div>`;
+        })
+        .join('');
+    };
+
+    document.getElementById('portal-btn').addEventListener('click', async () => {
+      const response = await fetch('/api/billing/portal', { method: 'POST', headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        accountInfo.textContent = data.error || 'Failed to open portal.';
+        return;
+      }
+      window.location.href = data.url;
+    });
+
+    document.getElementById('payg-btn').addEventListener('click', async () => {
+      const hours = Math.max(1, Number(document.getElementById('payg-hours').value || 1));
+      const response = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: 'payg', hours })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        accountInfo.textContent = data.error || 'Failed to start checkout.';
+        return;
+      }
+      window.location.href = data.url;
+    });
+
+    document.getElementById('refresh-btn').addEventListener('click', loadInvoices);
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('nmAuthToken');
+      window.location.href = 'login.html';
+    });
+
+    loadAccount();
+    loadUsage();
+    loadInvoices();
+  </script>
+</body>
+</html>

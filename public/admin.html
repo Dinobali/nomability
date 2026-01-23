@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomability Admin</title>
+  <link rel="stylesheet" href="nomability.css">
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <div class="nm-nav-actions">
+        <a class="nm-btn nm-btn-ghost" href="account.html">Account</a>
+        <button class="nm-btn nm-btn-ghost" id="logout">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="nm-app-shell">
+    <div class="nm-wrap nm-app-grid">
+      <section class="nm-panel">
+        <h2>Team members</h2>
+        <div id="members" class="nm-help">Loading members...</div>
+      </section>
+      <section class="nm-panel">
+        <h2>Invite member</h2>
+        <form id="invite-form" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="invite-email">Email</label>
+            <input id="invite-email" class="nm-input" type="email" required />
+          </div>
+          <div class="nm-field">
+            <label for="invite-role">Role</label>
+            <select id="invite-role" class="nm-select">
+              <option value="member">Member</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Send invite</button>
+        </form>
+        <p id="invite-status" class="nm-help" style="margin-top: 12px;"></p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const token = localStorage.getItem('nmAuthToken');
+    if (!token) {
+      window.location.href = 'login.html?redirect=admin.html';
+    }
+
+    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    const membersEl = document.getElementById('members');
+    const inviteStatus = document.getElementById('invite-status');
+
+    const loadMembers = async () => {
+      const response = await fetch('/api/admin/org/members', { headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        membersEl.textContent = data.error || 'Failed to load members.';
+        return;
+      }
+      if (!data.members?.length) {
+        membersEl.textContent = 'No members yet.';
+        return;
+      }
+      membersEl.innerHTML = data.members
+        .map((member) => {
+          const removeBtn = member.role !== 'owner'
+            ? `<button class="nm-btn nm-btn-ghost" data-remove="${member.id}">Remove</button>`
+            : '';
+          return `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+            <div>${member.user.email} — ${member.role}</div>
+            ${removeBtn}
+          </div>`;
+        })
+        .join('');
+
+      membersEl.querySelectorAll('[data-remove]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const memberId = btn.getAttribute('data-remove');
+          if (!memberId) return;
+          const response = await fetch(`/api/admin/org/members/${memberId}`, { method: 'DELETE', headers });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            membersEl.textContent = data.error || 'Failed to remove member.';
+            return;
+          }
+          loadMembers();
+        });
+      });
+    };
+
+    document.getElementById('invite-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      inviteStatus.textContent = 'Sending invite...';
+      const email = document.getElementById('invite-email').value.trim();
+      const role = document.getElementById('invite-role').value;
+      const response = await fetch('/api/admin/org/invite', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ email, role })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        inviteStatus.textContent = data.error || 'Invite failed.';
+        return;
+      }
+      inviteStatus.textContent = 'Invite sent.';
+      loadMembers();
+    });
+
+    document.getElementById('logout').addEventListener('click', () => {
+      localStorage.removeItem('nmAuthToken');
+      window.location.href = 'login.html';
+    });
+
+    loadMembers();
+  </script>
+</body>
+</html>

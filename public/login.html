@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomability Login</title>
+  <link rel="stylesheet" href="nomability.css">
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <div class="nm-nav-actions">
+        <a class="nm-btn nm-btn-ghost" href="register.html">Create account</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="nm-app-shell">
+    <div class="nm-wrap nm-app-grid">
+      <section class="nm-panel">
+        <h2>Sign in</h2>
+        <form id="login-form" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="email">Email</label>
+            <input id="email" class="nm-input" type="email" required />
+          </div>
+          <div class="nm-field">
+            <label for="password">Password</label>
+            <input id="password" class="nm-input" type="password" required />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Login</button>
+        </form>
+        <p id="login-status" class="nm-help" style="margin-top: 12px;"></p>
+        <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+          <a class="nm-btn nm-btn-ghost" href="magic-link.html">Send magic link</a>
+          <a class="nm-btn nm-btn-ghost" href="reset-password.html">Forgot password</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const form = document.getElementById('login-form');
+    const statusEl = document.getElementById('login-status');
+    const params = new URLSearchParams(window.location.search);
+    const redirectTo = params.get('redirect') || 'app.html';
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      statusEl.textContent = 'Signing in...';
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        statusEl.textContent = data.error || 'Login failed.';
+        return;
+      }
+      localStorage.setItem('nmAuthToken', data.token);
+      window.location.href = redirectTo;
+    });
+  </script>
+</body>
+</html>

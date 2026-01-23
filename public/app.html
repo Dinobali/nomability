@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nomability Studio</title>
+  <meta name="description" content="Nomability Studio - transcribe, translate, summarize, diarize, and sync subtitles from one dashboard.">
+  <link rel="canonical" href="https://nomability.net/app.html">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://nomability.net/app.html">
+  <meta property="og:title" content="Nomability Studio">
+  <meta property="og:description" content="Create transcription workflows with translation, summaries, diarization, and subtitle sync.">
+  <meta property="og:image" content="https://nomability.net/images/og-cover.png">
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Nomability Studio">
+  <meta name="twitter:description" content="Create transcription workflows with translation, summaries, diarization, and subtitle sync.">
+  <meta name="twitter:image" content="https://nomability.net/images/og-cover.png">
+
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='24' fill='%230b1020'/%3E%3Cpath d='M28 76V44l20 20 20-20v32' stroke='%2322d3ee' stroke-width='10' stroke-linecap='round' stroke-linejoin='round' fill='none'/%3E%3C/svg%3E">
+
+  <link rel="stylesheet" href="nomability.css">
+  <script defer src="https://analytics.nomability.net/script.js" data-website-id="nomability-id"></script>
+  <script defer src="nomability-app.js"></script>
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <nav class="nm-nav-links" aria-label="Primary">
+        <a href="/">Home</a>
+        <a href="/index.html#product">Product</a>
+        <a href="/index.html#pricing">Pricing</a>
+        <a href="account.html">Account</a>
+      </nav>
+      <div class="nm-nav-actions">
+        <span class="nm-chip">Studio</span>
+        <a class="nm-btn nm-btn-ghost" href="admin.html">Admin</a>
+        <a class="nm-btn nm-btn-primary" href="mailto:support@nomability.net">Talk to sales</a>
+      </div>
+      <button class="nm-nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false" data-nav-toggle>
+        Menu
+      </button>
+    </div>
+    <div class="nm-nav-mobile" data-nav-menu>
+      <a href="/">Home</a>
+      <a href="/index.html#product">Product</a>
+      <a href="/index.html#pricing">Pricing</a>
+    </div>
+  </header>
+
+  <main class="nm-app-shell">
+    <div class="nm-wrap">
+      <div class="nm-reveal" data-reveal>
+        <h1 class="nm-section-title">Nomability Studio</h1>
+        <p class="nm-section-subtitle">Build multi-step workflows for transcription, translation, summaries, and subtitle delivery.</p>
+      </div>
+
+      <div class="nm-app-grid" style="margin-top: 26px;">
+        <section class="nm-panel nm-reveal" data-reveal>
+          <h2>Create a job</h2>
+          <form id="nm-job-form">
+            <div class="nm-dropzone" data-dropzone>
+              <input id="nm-files" name="files" type="file" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.opus,.flac,.ogg" multiple style="display:none;">
+              <label for="nm-files" style="cursor:pointer; display:block;">
+                <strong>Drop audio or video files here</strong><br>
+                <span style="color: var(--nm-muted);">or click to browse</span>
+              </label>
+              <div class="nm-file-list" data-file-list></div>
+            </div>
+
+            <div class="nm-divider"></div>
+
+            <div class="nm-toggle-grid">
+              <label class="nm-toggle">Transcribe<input id="task-transcribe" type="checkbox" checked></label>
+              <label class="nm-toggle">Translate<input id="task-translate" type="checkbox"></label>
+              <label class="nm-toggle">Summarize<input id="task-summarize" type="checkbox"></label>
+              <label class="nm-toggle">Diarize<input id="task-diarize" type="checkbox"></label>
+              <label class="nm-toggle">Subtitles<input id="task-subtitle" type="checkbox" checked></label>
+              <label class="nm-toggle">Sync captions<input id="task-sync" type="checkbox"></label>
+              <label class="nm-toggle">Glossary<input id="task-glossary" type="checkbox"></label>
+            </div>
+
+            <div class="nm-divider"></div>
+
+            <div class="nm-grid nm-grid-2">
+              <div class="nm-field">
+                <label for="model">Model</label>
+                <select id="model" class="nm-select">
+                  <option value="tiny">tiny</option>
+                  <option value="base" selected>base</option>
+                  <option value="small">small</option>
+                  <option value="medium">medium</option>
+                  <option value="large">large</option>
+                </select>
+              </div>
+              <div class="nm-field">
+                <label for="language">Source language</label>
+                <input id="language" class="nm-input" placeholder="auto" />
+              </div>
+              <div class="nm-field">
+                <label for="target-language">Target language</label>
+                <input id="target-language" class="nm-input" placeholder="en, de, fr" />
+              </div>
+              <div class="nm-field">
+                <label for="summary-style">Summary style</label>
+                <select id="summary-style" class="nm-select">
+                  <option value="bullet">Bullet highlights</option>
+                  <option value="executive">Executive summary</option>
+                  <option value="action">Action items</option>
+                </select>
+              </div>
+              <div class="nm-field">
+                <label for="speaker-count">Speaker count</label>
+                <select id="speaker-count" class="nm-select">
+                  <option value="auto">Auto-detect</option>
+                  <option value="1">1 speaker</option>
+                  <option value="2">2 speakers</option>
+                  <option value="3">3+ speakers</option>
+                </select>
+              </div>
+              <div class="nm-field">
+                <label for="output-format">Primary export</label>
+                <select id="output-format" class="nm-select">
+                  <option value="txt">TXT</option>
+                  <option value="srt">SRT</option>
+                  <option value="vtt">VTT</option>
+                  <option value="json">JSON</option>
+                </select>
+              </div>
+              <div class="nm-field" style="grid-column: 1 / -1;">
+                <label for="api-base">API base URL</label>
+                <input id="api-base" class="nm-input" placeholder="https://api.example.com" />
+                <p class="nm-help">Optional override for the job backend (saved in your browser).</p>
+              </div>
+              <div class="nm-field" style="grid-column: 1 / -1;">
+                <label for="ollama-base">Ollama base URL (translation)</label>
+                <input id="ollama-base" class="nm-input" placeholder="http://localhost:11434" />
+                <p class="nm-help">Used when Translate is enabled and the backend does not return a translation.</p>
+              </div>
+            </div>
+
+            <div class="nm-divider"></div>
+
+            <div class="nm-field">
+              <label for="glossary">Glossary</label>
+              <textarea id="glossary" class="nm-textarea" placeholder="Enable glossary to lock terminology." disabled></textarea>
+            </div>
+
+            <div class="nm-field" style="margin-top: 12px;">
+              <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
+                <input id="timestamps" type="checkbox" checked>
+                Include timestamps
+              </label>
+            </div>
+
+            <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+              <button class="nm-btn nm-btn-primary" type="submit">Run job</button>
+              <button class="nm-btn nm-btn-ghost" type="button">Save preset</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="nm-panel nm-reveal" data-reveal style="--reveal-delay: 140ms;">
+          <h2>Job status</h2>
+          <div class="nm-status">
+            <span data-status>Idle</span>
+            <span data-progress-label>0%</span>
+          </div>
+          <div class="nm-progress" style="margin-top: 10px;">
+            <span data-progress-bar></span>
+          </div>
+
+          <div class="nm-divider"></div>
+
+          <div class="nm-tabs">
+            <button class="nm-tab" type="button" data-tab-target="transcript">Transcript</button>
+            <button class="nm-tab" type="button" data-tab-target="summary">Summary</button>
+            <button class="nm-tab" type="button" data-tab-target="translation">Translation</button>
+            <button class="nm-tab" type="button" data-tab-target="subtitles">Subtitles</button>
+            <button class="nm-tab" type="button" data-tab-target="json">JSON</button>
+          </div>
+
+          <div class="nm-output" data-tab-panel="transcript" data-output="transcript"></div>
+          <div class="nm-output" data-tab-panel="summary" data-output="summary" hidden></div>
+          <div class="nm-output" data-tab-panel="translation" data-output="translation" hidden></div>
+          <div class="nm-output" data-tab-panel="subtitles" data-output="subtitles" hidden></div>
+          <div class="nm-output" data-tab-panel="json" data-output="json" hidden></div>
+
+          <div class="nm-divider"></div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+            <button class="nm-btn nm-btn-ghost" type="button" data-download="transcript">Download TXT</button>
+            <button class="nm-btn nm-btn-ghost" type="button" data-download="subtitles">Download SRT</button>
+            <button class="nm-btn nm-btn-ghost" type="button" data-download="json">Download JSON</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script defer src="nomability.js"></script>
+</body>
+</html>
