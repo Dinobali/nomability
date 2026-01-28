@@ -25,12 +25,28 @@ app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, 
   }
 });
 
-app.register(cors, {
-  origin: [env.CLIENT_URL],
-  credentials: true
-});
+const allowedOrigins = new Set(
+  [
+    env.CLIENT_URL,
+    ...(env.CORS_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean)
+  ].filter(Boolean)
+);
 
 const isProd = env.NODE_ENV === 'production';
+const localhostPattern = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+app.register(cors, {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.has(origin)) return callback(null, true);
+    if (!isProd && localhostPattern.test(origin)) return callback(null, true);
+    return callback(new Error('Not allowed by CORS'), false);
+  },
+  credentials: true
+});
 
 const cspDirectives: Record<string, string[]> = {
   "default-src": ["'self'"],

@@ -14,6 +14,7 @@
   const initialsEls = Array.from(document.querySelectorAll('[data-auth-initials]'));
   const nameEls = Array.from(document.querySelectorAll('[data-auth-name]'));
   const emailEls = Array.from(document.querySelectorAll('[data-auth-email]'));
+  const roleEls = Array.from(document.querySelectorAll('[data-auth-role]'));
   const avatarButtons = Array.from(document.querySelectorAll('[data-auth-avatar]'));
   const logoutButtons = Array.from(document.querySelectorAll('[data-auth-logout]'));
 
@@ -47,6 +48,17 @@
     });
     emailEls.forEach((el) => {
       el.textContent = user?.email || '';
+    });
+  };
+
+  const setRoleVisibility = (role) => {
+    roleEls.forEach((el) => {
+      const required = (el.dataset.authRole || '')
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean);
+      const allowed = role && required.includes(role);
+      el.hidden = !allowed;
     });
   };
 
@@ -109,6 +121,7 @@
     if (!token) {
       setAuthVisibility(false);
       setUser(null);
+      setRoleVisibility(null);
       return;
     }
     setAuthVisibility(true);
@@ -120,14 +133,17 @@
         localStorage.removeItem(TOKEN_KEY);
         setUser(null);
         setAuthVisibility(false);
+        setRoleVisibility(null);
         return;
       }
       if (!response.ok) throw new Error('Failed');
       const data = await response.json().catch(() => ({}));
       if (!data.user) throw new Error('Missing user');
       setUser(data.user);
+      setRoleVisibility(data.membership?.role || null);
     } catch (error) {
       // Keep the optimistic logged-in state if the network is unavailable.
+      setRoleVisibility(null);
     }
   };
 
@@ -175,6 +191,7 @@
       closeProfileMenus();
       setAuthVisibility(false);
       setUser(null);
+      setRoleVisibility(null);
     });
   });
 

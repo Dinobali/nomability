@@ -801,6 +801,40 @@ body.nm-modal-open {
   min-height: 160px;
 }
 
+.nm-output-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.nm-live-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.nm-live-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.nm-live-audio {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.nm-live-partial {
+  color: var(--nm-muted);
+  font-style: italic;
+}
+
+.nm-live-timestamp {
+  color: var(--nm-muted);
+  font-size: 0.75rem;
+}
+
 .nm-pricing-hero {
   padding: 90px 0 70px;
 }

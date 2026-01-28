@@ -68,6 +68,11 @@
         <div id="members" class="nm-help">Loading members...</div>
       </section>
       <section class="nm-panel">
+        <h2>Invoice approvals</h2>
+        <p id="invoice-status" class="nm-help" style="margin-top: -8px;"></p>
+        <div id="invoice-approvals" class="nm-help">Loading invoices...</div>
+      </section>
+      <section class="nm-panel">
         <h2>Invite member</h2>
         <form id="invite-form" class="nm-grid" style="gap: 16px;">
           <div class="nm-field">
@@ -89,14 +94,63 @@
   </main>
 
   <script>
-    const token = localStorage.getItem('nmAuthToken');
-    if (!token) {
-      window.location.href = 'login.html?redirect=admin.html';
-    }
-
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    let headers = { 'Content-Type': 'application/json' };
     const membersEl = document.getElementById('members');
     const inviteStatus = document.getElementById('invite-status');
+    const invoiceApprovals = document.getElementById('invoice-approvals');
+    const invoiceStatus = document.getElementById('invoice-status');
+
+    const formatDate = (value) => {
+      if (!value) return '—';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '—';
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+
+    const formatCurrency = (amount, currency = 'EUR') => {
+      if (amount == null || Number.isNaN(amount)) return '—';
+      return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+    };
+
+    const redirectToLogin = () => {
+      window.location.href = 'login.html?redirect=admin.html';
+    };
+
+    const redirectUnauthorized = () => {
+      window.location.href = 'profile.html';
+    };
+
+    const requireAdmin = async () => {
+      const token = localStorage.getItem('nmAuthToken');
+      if (!token) {
+        redirectToLogin();
+        return false;
+      }
+      try {
+        const response = await fetch('/api/auth/me', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('nmAuthToken');
+          redirectToLogin();
+          return false;
+        }
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          redirectToLogin();
+          return false;
+        }
+        if (data.membership?.role !== 'admin') {
+          redirectUnauthorized();
+          return false;
+        }
+        headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+        return true;
+      } catch (error) {
+        redirectToLogin();
+        return false;
+      }
+    };
 
     const loadMembers = async () => {
       const response = await fetch('/api/admin/org/members', { headers });
@@ -136,6 +190,67 @@
       });
     };
 
+    const renderInvoices = (invoices) => {
+      if (!invoiceApprovals) return;
+      if (!invoices?.length) {
+        invoiceApprovals.textContent = 'No invoice requests yet.';
+        return;
+      }
+
+      invoiceApprovals.innerHTML = invoices.map((invoice) => {
+        const status = invoice.status || 'pending';
+        const currency = invoice.currency ? String(invoice.currency).toUpperCase() : 'EUR';
+        const amount = formatCurrency((invoice.amountCents || 0) / 100, currency);
+        const requestedBy = invoice.user?.email || invoice.billingName || 'Unknown';
+        const createdAt = formatDate(invoice.createdAt);
+        const dueDate = formatDate(invoice.dueDate);
+        const actions = status === 'pending'
+          ? `<div class="nm-inline-actions">
+              <button class="nm-btn nm-btn-primary nm-btn-sm" data-invoice-action="paid" data-invoice-id="${invoice.id}">Mark paid</button>
+              <button class="nm-btn nm-btn-ghost nm-btn-sm" data-invoice-action="rejected" data-invoice-id="${invoice.id}">Reject</button>
+            </div>`
+          : `<div class="nm-help">Status: ${status}</div>`;
+
+        return `<div class="nm-invoice-item">
+          <div class="nm-invoice-title">${invoice.invoiceNumber} · ${invoice.planKey} · ${amount}</div>
+          <div class="nm-invoice-meta">Requested by ${requestedBy} · Created ${createdAt} · Due ${dueDate}</div>
+          ${actions}
+        </div>`;
+      }).join('');
+
+      invoiceApprovals.querySelectorAll('[data-invoice-action]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const invoiceId = button.getAttribute('data-invoice-id');
+          const status = button.getAttribute('data-invoice-action');
+          if (!invoiceId || !status) return;
+          if (invoiceStatus) invoiceStatus.textContent = 'Updating invoice...';
+          const response = await fetch(`/api/admin/org/invoices/${invoiceId}`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ status })
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            if (invoiceStatus) invoiceStatus.textContent = data.error || 'Failed to update invoice.';
+            return;
+          }
+          if (invoiceStatus) invoiceStatus.textContent = 'Invoice updated.';
+          loadInvoices();
+        });
+      });
+    };
+
+    const loadInvoices = async () => {
+      if (!invoiceApprovals) return;
+      const response = await fetch('/api/admin/org/invoices', { headers });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        invoiceApprovals.textContent = data.error || 'Failed to load invoices.';
+        return;
+      }
+      renderInvoices(data.invoices || []);
+    };
+
     document.getElementById('invite-form').addEventListener('submit', async (event) => {
       event.preventDefault();
       inviteStatus.textContent = 'Sending invite...';
@@ -162,7 +277,14 @@
       });
     });
 
-    loadMembers();
+    const init = async () => {
+      const ok = await requireAdmin();
+      if (!ok) return;
+      loadMembers();
+      loadInvoices();
+    };
+
+    init();
   </script>
 </body>
 </html>

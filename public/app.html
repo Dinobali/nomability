@@ -25,6 +25,7 @@
   <script defer src="nomability.js"></script>
   <script defer src="nomability-auth.js"></script>
   <script defer src="nomability-app.js"></script>
+  <script defer src="nomability-live.js"></script>
 </head>
 <body>
   <header class="nm-header">
@@ -38,7 +39,7 @@
       </nav>
       <div class="nm-nav-actions">
         <span class="nm-chip">Studio</span>
-        <a class="nm-btn nm-btn-ghost" href="admin.html">Admin</a>
+        <a class="nm-btn nm-btn-ghost" href="admin.html" data-auth-role="admin" hidden>Admin</a>
         <a class="nm-btn nm-btn-primary" href="mailto:support@nomability.net">Talk to sales</a>
         <div class="nm-auth-actions">
           <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
@@ -227,6 +228,136 @@
           </div>
         </section>
       </div>
+
+      <section id="live" class="nm-section" style="padding-top: 60px;">
+        <div class="nm-reveal" data-reveal>
+          <span class="nm-pill">Live capture</span>
+          <h2 class="nm-section-title">Record or stream audio in real time.</h2>
+          <p class="nm-section-subtitle">Record in the browser and stream transcripts as they arrive. Translate or summarize once the transcript is ready, then export or share.</p>
+        </div>
+        <div class="nm-grid nm-grid-2" style="margin-top: 32px;">
+          <section class="nm-panel nm-reveal" data-reveal data-recording-panel>
+            <div class="nm-live-header">
+              <h3>Record and process (FastWhisperAPI)</h3>
+              <span class="nm-chip" data-rec-status>Idle</span>
+            </div>
+            <p class="nm-help">Capture audio from your microphone and stream the transcript as it is generated.</p>
+            <div class="nm-status" style="margin-top: 10px;">
+              <span>Progress</span>
+              <span data-rec-progress-label>0%</span>
+            </div>
+            <div class="nm-progress">
+              <span data-rec-progress-bar></span>
+            </div>
+            <div class="nm-divider"></div>
+            <div class="nm-live-controls">
+              <button class="nm-btn nm-btn-primary" type="button" data-rec-start>Start recording</button>
+              <button class="nm-btn nm-btn-ghost" type="button" data-rec-stop disabled>Stop</button>
+              <span class="nm-chip" data-rec-timer>00:00</span>
+            </div>
+            <audio class="nm-live-audio" data-rec-audio controls hidden></audio>
+            <div class="nm-divider"></div>
+            <div class="nm-toggle-grid">
+              <label class="nm-toggle">Transcribe<input type="checkbox" checked disabled data-rec-task="transcribe"></label>
+              <label class="nm-toggle">Translate<input type="checkbox" data-rec-task="translate"></label>
+              <label class="nm-toggle">Summarize<input type="checkbox" data-rec-task="summarize"></label>
+            </div>
+            <div class="nm-grid nm-grid-2" style="margin-top: 16px;">
+              <div class="nm-field">
+                <label for="rec-model">Model</label>
+                <select id="rec-model" class="nm-select" data-rec-model>
+                  <option value="tiny">tiny</option>
+                  <option value="base" selected>base</option>
+                  <option value="small">small</option>
+                  <option value="medium">medium</option>
+                  <option value="large">large</option>
+                </select>
+              </div>
+              <div class="nm-field">
+                <label for="rec-language">Language (optional)</label>
+                <input id="rec-language" class="nm-input" placeholder="auto" data-rec-language />
+              </div>
+              <div class="nm-field">
+                <label for="rec-target-language">Target language</label>
+                <input id="rec-target-language" class="nm-input" placeholder="en, de, fr" data-rec-target-language />
+              </div>
+              <div class="nm-field">
+                <label for="rec-summary-style">Summary style</label>
+                <select id="rec-summary-style" class="nm-select" data-rec-summary-style>
+                  <option value="bullet">Bullet highlights</option>
+                  <option value="executive">Executive summary</option>
+                  <option value="action">Action items</option>
+                </select>
+              </div>
+              <div class="nm-field" style="grid-column: 1 / -1;">
+                <label for="rec-api-base">FastWhisperAPI base URL</label>
+                <input id="rec-api-base" class="nm-input" placeholder="http://localhost:8008" data-rec-api-base />
+                <p class="nm-help">Used for streaming transcription.</p>
+              </div>
+              <div class="nm-field" style="grid-column: 1 / -1;">
+                <label for="rec-job-base">Nomability API base URL (optional)</label>
+                <input id="rec-job-base" class="nm-input" placeholder="https://api.example.com" data-rec-job-base />
+                <p class="nm-help">Required for translation and summaries when running jobs.</p>
+              </div>
+            </div>
+            <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+              <button class="nm-btn nm-btn-primary" type="button" data-rec-process disabled>Process recording</button>
+              <button class="nm-btn nm-btn-ghost" type="button" data-rec-clear disabled>Clear</button>
+            </div>
+            <div class="nm-divider"></div>
+            <div class="nm-tabs">
+              <button class="nm-tab active" type="button" data-rec-tab="transcript">Transcript</button>
+              <button class="nm-tab" type="button" data-rec-tab="summary">Summary</button>
+              <button class="nm-tab" type="button" data-rec-tab="translation">Translation</button>
+            </div>
+            <div class="nm-output nm-output-scroll" data-rec-panel="transcript">Record audio to see a streaming transcript.</div>
+            <div class="nm-output nm-output-scroll" data-rec-panel="summary" hidden>Summaries appear after processing.</div>
+            <div class="nm-output nm-output-scroll" data-rec-panel="translation" hidden>Translations appear after processing.</div>
+          </section>
+
+          <section class="nm-panel nm-reveal" data-reveal style="--reveal-delay: 140ms;" data-live-panel>
+            <div class="nm-live-header">
+              <h3>Real-time transcription (WhisperLive)</h3>
+              <span class="nm-chip" data-live-status>Idle</span>
+            </div>
+            <p class="nm-help">Stream microphone audio to WhisperLive over WebSocket and watch the transcript update live.</p>
+            <div class="nm-divider"></div>
+            <div class="nm-grid nm-grid-2">
+              <div class="nm-field">
+                <label for="live-ws">WhisperLive WebSocket</label>
+                <input id="live-ws" class="nm-input" placeholder="ws://localhost:9090" data-live-ws />
+              </div>
+              <div class="nm-field">
+                <label for="live-language">Language (optional)</label>
+                <input id="live-language" class="nm-input" placeholder="auto" data-live-language />
+              </div>
+              <div class="nm-field">
+                <label for="live-model">Model</label>
+                <select id="live-model" class="nm-select" data-live-model>
+                  <option value="tiny">tiny</option>
+                  <option value="base" selected>base</option>
+                  <option value="small">small</option>
+                  <option value="medium">medium</option>
+                  <option value="large">large</option>
+                </select>
+              </div>
+              <div class="nm-field">
+                <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
+                  <input type="checkbox" data-live-vad />
+                  Enable VAD
+                </label>
+              </div>
+            </div>
+            <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+              <button class="nm-btn nm-btn-primary" type="button" data-live-start>Start live</button>
+              <button class="nm-btn nm-btn-ghost" type="button" data-live-stop disabled>Stop</button>
+              <button class="nm-btn nm-btn-soft" type="button" data-live-clear disabled>Clear</button>
+            </div>
+            <div class="nm-divider"></div>
+            <div class="nm-output nm-output-scroll" data-live-output>Start WhisperLive to see real-time transcription.</div>
+          </section>
+        </div>
+      </section>
     </div>
   </main>
   <div class="nm-auth-overlay" data-auth-modal hidden>

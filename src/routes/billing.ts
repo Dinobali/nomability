@@ -220,28 +220,36 @@ export const billingRoutes = async (app: FastifyInstance) => {
 
     if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.created') {
       const subscription = event.data.object as Stripe.Subscription;
+      const orgId = await resolveOrgId(subscription.customer as string);
+      const priceId = subscription.items.data[0]?.price.id;
+      const currentPeriodEnd = subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000)
+        : null;
       await prisma.subscription.upsert({
-        where: { stripeSubscriptionId: subscription.id },
+        where: { orgId },
         create: {
-          orgId: await resolveOrgId(subscription.customer as string),
+          orgId,
           stripeSubscriptionId: subscription.id,
-          priceId: subscription.items.data[0]?.price.id,
+          priceId,
           status: subscription.status,
-          currentPeriodEnd: subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : null
+          currentPeriodEnd
         },
         update: {
-          priceId: subscription.items.data[0]?.price.id,
+          stripeSubscriptionId: subscription.id,
+          priceId,
           status: subscription.status,
-          currentPeriodEnd: subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : null
+          currentPeriodEnd
         }
       });
     }
 
     if (event.type === 'customer.subscription.deleted') {
       const subscription = event.data.object as Stripe.Subscription;
+      const orgId = await resolveOrgId(subscription.customer as string);
       await prisma.subscription.updateMany({
-        where: { stripeSubscriptionId: subscription.id },
+        where: { orgId },
         data: {
+          stripeSubscriptionId: subscription.id,
           status: subscription.status,
           currentPeriodEnd: subscription.current_period_end ? new Date(subscription.current_period_end * 1000) : null
         }

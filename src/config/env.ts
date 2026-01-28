@@ -17,6 +17,7 @@ const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().default(3003),
   CLIENT_URL: z.string().default('http://localhost:3003'),
+  CORS_ALLOWED_ORIGINS: z.string().optional(),
   AUTH_REQUIRED: booleanFromEnv(false),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 chars'),
   JWT_EXPIRE: z.string().default('7d'),

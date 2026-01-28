@@ -43,9 +43,17 @@ export const getPlanByKey = (key?: string | null) => {
   return PLAN_DEFINITIONS.find((plan) => plan.key === key);
 };
 
+const normalizePriceId = (priceId?: string | null) => {
+  if (!priceId) return null;
+  return priceId.startsWith('manual:') ? priceId.slice('manual:'.length) : priceId;
+};
+
 export const getPlanByPriceId = (priceId?: string | null) => {
   if (!priceId) return undefined;
-  return PLAN_DEFINITIONS.find((plan) => plan.priceId === priceId);
+  const normalized = normalizePriceId(priceId);
+  return PLAN_DEFINITIONS.find((plan) => plan.priceId === priceId)
+    || (normalized ? PLAN_DEFINITIONS.find((plan) => plan.key === normalized) : undefined)
+    || (normalized ? PLAN_DEFINITIONS.find((plan) => plan.priceId === normalized) : undefined);
 };
 
 export const getPriceIdForPlan = (planKey?: string | null) => {

@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<!-- Added meta description -->
     <meta name="description" content="FastWhisperAPI Transcription tool - Live transcription, voice recorder and more.">
     <title>FastWhisperAPI Transcription</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -89,7 +88,6 @@
             <form @submit.prevent="transcribe" class="space-y-4">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <!-- Changed id from "file" to "audioFile" -->
                         <label for="audioFile" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Audio File(s)</label>
                         <input type="file" id="audioFile" @change="handleFileChange" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.opus,.flac,.ogg" class="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-gray-300" multiple>
                     </div>
@@ -157,23 +155,38 @@
         <div class="bg-white dark:bg-gray-800 shadow-md rounded-lg p-6 mb-8">
             <h2 class="text-xl font-semibold mb-4 flex items-center text-gray-900 dark:text-gray-100">
                 <i data-lucide="mic" class="w-6 h-6 mr-2"></i>
-                Live Dictation
+                Real-Time Transcription
             </h2>
             <div class="space-y-4">
                 <div class="flex items-center space-x-4">
-                    <button @click="startDictation" x-show="!isRecording" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 flex items-center">
+                    <button @click="startRealtimeTranscription" x-show="!isRealtimeActive" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 flex items-center">
                         <i data-lucide="mic" class="w-5 h-5 mr-2"></i>
-                        Start Recording
+                        Start Real-Time
                     </button>
-                    <button @click="stopDictation" x-show="isRecording" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition duration-300 flex items-center">
+                    <button @click="stopRealtimeTranscription" x-show="isRealtimeActive" class="bg-red-500 text-white px-4 py-2 rounded-md hover:bg-red-600 transition duration-300 flex items-center">
                         <i data-lucide="mic-off" class="w-5 h-5 mr-2"></i>
-                        Stop Recording
+                        Stop Real-Time
                     </button>
-                    <span x-show="isRecording" class="text-red-500 animate-pulse">Recording...</span>
+                    <span x-show="isRealtimeActive" class="flex items-center space-x-2">
+                        <span class="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>
+                        <span class="text-red-500 font-medium">Recording & Transcribing...</span>
+                    </span>
                 </div>
-                <div x-show="liveDictationText" class="bg-gray-100 dark:bg-gray-700 p-4 rounded-md">
-                    <h3 class="font-semibold mb-2 text-gray-900 dark:text-gray-100">Live Transcription:</h3>
-                    <p x-text="liveDictationText" class="text-gray-700 dark:text-gray-300"></p>
+                <div x-show="isRealtimeTranscribing" class="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
+                    <i data-lucide="loader" class="w-4 h-4 animate-spin"></i>
+                    <span class="text-sm">Processing audio chunk...</span>
+                </div>
+                <div x-show="realtimeTranscriptionText" class="bg-gray-100 dark:bg-gray-700 p-4 rounded-md max-h-96 overflow-y-auto">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-semibold text-gray-900 dark:text-gray-100">Live Transcription:</h3>
+                        <button @click="clearRealtimeTranscription" class="text-sm text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400">
+                            <i data-lucide="trash-2" class="w-4 h-4 inline"></i> Clear
+                        </button>
+                    </div>
+                    <p x-html="realtimeTranscriptionText" class="text-gray-700 dark:text-gray-300 whitespace-pre-wrap"></p>
+                </div>
+                <div class="text-sm text-gray-600 dark:text-gray-400">
+                    <p><strong>Tip:</strong> Audio is captured in 3-second chunks and transcribed immediately for near-instant results.</p>
                 </div>
             </div>
         </div>
@@ -350,7 +363,6 @@
                     if (this.isEnabled) {
                         document.documentElement.classList.add('dark');
                     }
-                    // Check system preference if no preference is stored
                     if (localStorage.getItem('darkMode') === null) {
                         this.isEnabled = window.matchMedia('(prefers-color-scheme: dark)').matches;
                         document.documentElement.classList.toggle('dark', this.isEnabled);
@@ -386,6 +398,12 @@
                 showHelp: false,
                 showSettings: false,
                 files: [],
+                isRealtimeActive: false,
+                isRealtimeTranscribing: false,
+                realtimeTranscriptionText: '',
+                realtimeMediaRecorder: null,
+                realtimeStream: null,
+                realtimeChunkInterval: null,
                 apiEndpoint: localStorage.getItem('apiEndpoint') || 'http://192.168.178.122:8008',
                 defaultModel: localStorage.getItem('defaultModel') || 'base',
                 defaultLanguage: localStorage.getItem('defaultLanguage') || '',
@@ -401,7 +419,6 @@
                         return;
                     }
                     
-                    // Validate API endpoint
                     try {
                         new URL(this.apiEndpoint);
                     } catch (e) {
@@ -457,7 +474,6 @@
                                     this.progress = parsedChunk.progress;
                                 }
                             } catch (e) {
-                                // Not a progress update, continue
                             }
                         }
                         
@@ -498,7 +514,6 @@
                             }
                         });
                         
-                        // Handle case where segment ends without punctuation
                         if (currentSentence !== '' && index === data.segments.length - 1) {
                             if (this.include_timestamps) {
                                 formattedText += `[${sentenceStart.toFixed(2)}s -> ${segment.words[segment.words.length - 1].end.toFixed(2)}s] `;
@@ -533,90 +548,6 @@
                     URL.revokeObjectURL(url);
                 },
 
-                async startDictation() {
-                    this.error = ''; // Clear any previous errors
-                    
-                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                        this.error = 'Your browser does not support audio recording. Please try using a modern browser like Chrome, Firefox, or Edge.';
-                        return;
-                    }
-
-                    try {
-                        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                        this.isRecording = true;
-                        this.mediaRecorder = new MediaRecorder(stream);
-                        this.audioChunks = [];
-
-                        this.mediaRecorder.ondataavailable = (event) => {
-                            this.audioChunks.push(event.data);
-                        };
-
-                        this.mediaRecorder.onstop = () => {
-                            const audioBlob = new Blob(this.audioChunks, { type: 'audio/wav' });
-                            this.transcribeLiveAudio(audioBlob);
-                        };
-
-                        this.mediaRecorder.start(1000); // Collect data every second
-                    } catch (error) {
-                        if (error.name === 'NotAllowedError') {
-                            this.error = 'Microphone access was denied. Please allow microphone access and try again.';
-                        } else if (error.name === 'NotFoundError') {
-                            this.error = 'No microphone was found. Please check your audio input devices and try again.';
-                        } else {
-                            this.error = `Error accessing microphone: ${error.message}`;
-                        }
-                        console.error('Microphone access error:', error);
-                    }
-                },
-
-                stopDictation() {
-                    if (this.mediaRecorder && this.mediaRecorder.state !== 'inactive') {
-                        this.mediaRecorder.stop();
-                        this.isRecording = false;
-                    }
-                },
-
-                async transcribeLiveAudio(audioBlob) {
-                    const formData = new FormData();
-                    // Append as array of files to match the API expectation
-                    formData.append('file', audioBlob, 'live_audio.wav');
-                    formData.append('model', this.model);
-                    if (this.language) formData.append('language', this.language);
-                    if (this.initial_prompt) formData.append('initial_prompt', this.initial_prompt);
-                    formData.append('vad_filter', String(this.vad_filter));
-                    formData.append('min_silence_duration_ms', String(this.min_silence_duration_ms));
-                    formData.append('response_format', 'verbose_json');
-                    formData.append('timestamp_granularities', 'word');
-
-                    try {
-                        const response = await fetch(`${this.apiEndpoint}/v1/transcriptions`, {
-                            method: 'POST',
-                            body: formData,
-                            headers: {
-                                'Accept': 'application/json',
-                            }
-                        });
-
-                        if (!response.ok) {
-                            const errorText = await response.text();
-                            throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
-                        }
-
-                        const result = await response.text();
-                        // Validate that the response is valid JSON before parsing
-                        try {
-                            const parsedResult = JSON.parse(result);
-                            const formattedTranscription = this.formatTranscription(parsedResult);
-                            this.liveDictationText += formattedTranscription;
-                        } catch (e) {
-                            throw new Error('Invalid JSON response from server');
-                        }
-                    } catch (e) {
-                        this.error = `Error transcribing live audio: ${e.message}`;
-                        console.error('Transcription error:', e);
-                    }
-                },
-
                 toggleVoiceRecorder() {
                     if (this.isVoiceRecording) {
                         this.stopVoiceRecording();
@@ -626,7 +557,7 @@
                 },
 
                 async startVoiceRecording() {
-                    if (this.isRecording) return; // Don't start if live dictation is running
+                    if (this.isRecording) return;
                     
                     try {
                         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -714,7 +645,6 @@
                             this.transcription = result;
                         }
 
-                        // Clear recording state
                         this.discardRecording();
                     } catch (error) {
                         this.error = `Failed to transcribe: ${error.message}`;
@@ -739,15 +669,136 @@
                     URL.revokeObjectURL(url);
                 },
 
+                async startRealtimeTranscription() {
+                    this.error = '';
+                    
+                    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        this.error = 'Your browser does not support audio recording.';
+                        return;
+                    }
+
+                    try {
+                        this.realtimeStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                        this.isRealtimeActive = true;
+                        this.realtimeTranscriptionText = '';
+                        
+                        this.realtimeMediaRecorder = new MediaRecorder(this.realtimeStream, {
+                            mimeType: 'audio/webm;codecs=opus'
+                        });
+                        
+                        let currentChunks = [];
+                        
+                        this.realtimeMediaRecorder.ondataavailable = (event) => {
+                            if (event.data.size > 0) {
+                                currentChunks.push(event.data);
+                            }
+                        };
+
+                        this.realtimeMediaRecorder.start();
+                        
+                        this.realtimeChunkInterval = setInterval(async () => {
+                            if (currentChunks.length > 0 && !this.isRealtimeTranscribing) {
+                                this.realtimeMediaRecorder.requestData();
+                                
+                                await new Promise(resolve => setTimeout(resolve, 100));
+                                
+                                const audioBlob = new Blob(currentChunks, { type: 'audio/webm' });
+                                currentChunks = [];
+                                
+                                if (audioBlob.size > 1000) {
+                                    await this.transcribeRealtimeChunk(audioBlob);
+                                }
+                            }
+                        }, 3000);
+
+                    } catch (error) {
+                        if (error.name === 'NotAllowedError') {
+                            this.error = 'Microphone access was denied.';
+                        } else if (error.name === 'NotFoundError') {
+                            this.error = 'No microphone was found.';
+                        } else {
+                            this.error = `Error: ${error.message}`;
+                        }
+                        console.error('Microphone error:', error);
+                    }
+                },
+
+                async stopRealtimeTranscription() {
+                    this.isRealtimeActive = false;
+                    
+                    if (this.realtimeChunkInterval) {
+                        clearInterval(this.realtimeChunkInterval);
+                        this.realtimeChunkInterval = null;
+                    }
+                    
+                    if (this.realtimeMediaRecorder && this.realtimeMediaRecorder.state !== 'inactive') {
+                        this.realtimeMediaRecorder.stop();
+                    }
+                    
+                    if (this.realtimeStream) {
+                        this.realtimeStream.getTracks().forEach(track => track.stop());
+                        this.realtimeStream = null;
+                    }
+                },
+
+                async transcribeRealtimeChunk(audioBlob) {
+                    this.isRealtimeTranscribing = true;
+                    
+                    const formData = new FormData();
+                    formData.append('file', audioBlob, 'realtime_chunk.webm');
+                    formData.append('model', this.model);
+                    if (this.language) formData.append('language', this.language);
+                    if (this.initial_prompt) formData.append('initial_prompt', this.initial_prompt);
+                    formData.append('vad_filter', String(this.vad_filter));
+                    formData.append('min_silence_duration_ms', String(this.min_silence_duration_ms));
+                    formData.append('response_format', 'verbose_json');
+                    formData.append('timestamp_granularities', 'segment');
+
+                    try {
+                        const response = await fetch(`${this.apiEndpoint}/v1/transcriptions`, {
+                            method: 'POST',
+                            body: formData,
+                            headers: {
+                                'Accept': 'application/json',
+                            }
+                        });
+
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+
+                        const result = await response.text();
+                        const parsedResult = JSON.parse(result);
+                        
+                        if (parsedResult.text && parsedResult.text.trim()) {
+                            const timestamp = new Date().toLocaleTimeString();
+                            this.realtimeTranscriptionText += `<span class="text-gray-500 text-xs">[${timestamp}]</span> ${parsedResult.text.trim()}\n\n`;
+                            
+                            this.$nextTick(() => {
+                                const container = document.querySelector('.max-h-96.overflow-y-auto');
+                                if (container) {
+                                    container.scrollTop = container.scrollHeight;
+                                }
+                            });
+                        }
+                    } catch (e) {
+                        console.error('Real-time transcription error:', e);
+                    } finally {
+                        this.isRealtimeTranscribing = false;
+                    }
+                },
+
+                clearRealtimeTranscription() {
+                    this.realtimeTranscriptionText = '';
+                },
+
                 init() {
                     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                         console.warn('Audio recording is not supported in this browser');
                     }
                     
-                    // Initialize dark mode store
                     Alpine.store('darkMode').init();
                     
-                    // Initialize settings
                     this.include_timestamps = this.defaultIncludeTimestamps;
                     
                     this.initTooltips();

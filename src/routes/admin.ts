@@ -3,6 +3,7 @@ import { prisma } from '../lib/db.js';
 import { generateToken, hashToken } from '../lib/auth.js';
 import { sendMail } from '../lib/email.js';
 import { env } from '../config/env.js';
+import { getPlanByKey } from '../lib/plans.js';
 
 const requireAdmin = async (req: any, reply: any) => {
   const user = req.user as { sub?: string; orgId?: string };
@@ -12,7 +13,7 @@ const requireAdmin = async (req: any, reply: any) => {
   const membership = await prisma.membership.findFirst({
     where: { orgId: user.orgId, userId: user.sub }
   });
-  if (!membership || (membership.role !== 'owner' && membership.role !== 'admin')) {
+  if (!membership || membership.role !== 'admin') {
     return reply.status(403).send({ error: 'Not authorized.' });
   }
 };
@@ -88,5 +89,69 @@ export const adminRoutes = async (app: FastifyInstance) => {
 
     await prisma.membership.delete({ where: { id: memberId } });
     return reply.send({ ok: true });
+  });
+
+  app.get('/api/admin/org/invoices', { preHandler: [app.authenticate, requireAdmin] }, async (req, reply) => {
+    const user = req.user as { orgId?: string };
+    const invoices = await prisma.invoiceRequest.findMany({
+      where: { orgId: user.orgId },
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { email: true, name: true } } }
+    });
+    return reply.send({ invoices });
+  });
+
+  app.post('/api/admin/org/invoices/:id', { preHandler: [app.authenticate, requireAdmin] }, async (req, reply) => {
+    const user = req.user as { orgId?: string };
+    const invoiceId = (req.params as { id?: string }).id;
+    const body = req.body as { status?: string };
+    if (!invoiceId) {
+      return reply.status(400).send({ error: 'Invoice ID is required.' });
+    }
+    if (body.status !== 'paid' && body.status !== 'rejected') {
+      return reply.status(400).send({ error: 'Invalid status.' });
+    }
+
+    const invoice = await prisma.invoiceRequest.findUnique({ where: { id: invoiceId } });
+    if (!invoice || invoice.orgId !== user.orgId) {
+      return reply.status(404).send({ error: 'Invoice not found.' });
+    }
+    if (invoice.status !== 'pending') {
+      return reply.status(400).send({ error: 'Invoice already processed.' });
+    }
+
+    const updated = await prisma.invoiceRequest.update({
+      where: { id: invoiceId },
+      data: { status: body.status }
+    });
+
+    if (body.status === 'paid') {
+      const plan = getPlanByKey(invoice.planKey);
+      if (!plan) {
+        return reply.status(400).send({ error: 'Plan not found for invoice.' });
+      }
+      const priceId = plan.priceId || `manual:${plan.key}`;
+      const periodEnd = new Date();
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+      await prisma.subscription.upsert({
+        where: { orgId: invoice.orgId },
+        create: {
+          orgId: invoice.orgId,
+          stripeSubscriptionId: `manual:${invoice.invoiceNumber}`,
+          priceId,
+          status: 'active',
+          currentPeriodEnd: periodEnd
+        },
+        update: {
+          stripeSubscriptionId: `manual:${invoice.invoiceNumber}`,
+          priceId,
+          status: 'active',
+          currentPeriodEnd: periodEnd
+        }
+      });
+      await prisma.org.update({ where: { id: invoice.orgId }, data: { overLimit: false } });
+    }
+
+    return reply.send({ invoice: updated });
   });
 };
