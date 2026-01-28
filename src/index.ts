@@ -13,7 +13,7 @@ import { jobRoutes } from './routes/jobs.js';
 import { billingRoutes } from './routes/billing.js';
 import { adminRoutes } from './routes/admin.js';
 
-const app = Fastify({ logger: true });
+const app = Fastify({ logger: true, trustProxy: true });
 
 app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (req, body, done) => {
   (req as any).rawBody = body;
@@ -63,6 +63,8 @@ const cspDirectives: Record<string, string[]> = {
     "'self'",
     'https://api.nomability.net',
     'wss://api.nomability.net',
+    'https://ai.nomability.net',
+    'wss://ai.nomability.net',
     'https://analytics.nomability.net'
   ],
   "form-action": ["'self'"],
@@ -85,9 +87,20 @@ app.register(helmet, {
     directives: cspDirectives
   }
 });
-app.register(rateLimit, { max: 200, timeWindow: '1 minute' });
+app.register(rateLimit, {
+  max: 200,
+  timeWindow: '1 minute',
+  keyGenerator: (req) => {
+    const cfConnectingIp = req.headers['cf-connecting-ip'];
+    if (Array.isArray(cfConnectingIp)) return cfConnectingIp[0];
+    if (typeof cfConnectingIp === 'string' && cfConnectingIp.trim()) return cfConnectingIp.trim();
+    const xff = req.headers['x-forwarded-for'];
+    if (typeof xff === 'string' && xff.trim()) return xff.split(',')[0].trim();
+    return req.ip;
+  }
+});
 app.register(cookie);
-app.register(jwt, { secret: env.JWT_SECRET });
+app.register(jwt, { secret: env.JWT_SECRET, sign: { expiresIn: env.JWT_EXPIRE } });
 
 app.decorate('authenticate', async (req: any, reply: any) => {
   if (!env.AUTH_REQUIRED) return;

@@ -163,30 +163,36 @@
         membersEl.textContent = 'No members yet.';
         return;
       }
-      membersEl.innerHTML = data.members
-        .map((member) => {
-          const removeBtn = member.role !== 'owner'
-            ? `<button class="nm-btn nm-btn-ghost" data-remove="${member.id}">Remove</button>`
-            : '';
-          return `<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div>${member.user.email} — ${member.role}</div>
-            ${removeBtn}
-          </div>`;
-        })
-        .join('');
+      membersEl.innerHTML = '';
+      data.members.forEach((member) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.alignItems = 'center';
+        row.style.marginBottom = '10px';
 
-      membersEl.querySelectorAll('[data-remove]').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          const memberId = btn.getAttribute('data-remove');
-          if (!memberId) return;
-          const response = await fetch(`/api/admin/org/members/${memberId}`, { method: 'DELETE', headers });
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            membersEl.textContent = data.error || 'Failed to remove member.';
-            return;
-          }
-          loadMembers();
-        });
+        const label = document.createElement('div');
+        label.textContent = `${member.user.email} — ${member.role}`;
+        row.appendChild(label);
+
+        if (member.role !== 'owner') {
+          const removeBtn = document.createElement('button');
+          removeBtn.className = 'nm-btn nm-btn-ghost';
+          removeBtn.type = 'button';
+          removeBtn.textContent = 'Remove';
+          removeBtn.addEventListener('click', async () => {
+            const response = await fetch(`/api/admin/org/members/${member.id}`, { method: 'DELETE', headers });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              membersEl.textContent = data.error || 'Failed to remove member.';
+              return;
+            }
+            loadMembers();
+          });
+          row.appendChild(removeBtn);
+        }
+
+        membersEl.appendChild(row);
       });
     };
 
@@ -197,46 +203,84 @@
         return;
       }
 
-      invoiceApprovals.innerHTML = invoices.map((invoice) => {
+      invoiceApprovals.innerHTML = '';
+      invoices.forEach((invoice) => {
         const status = invoice.status || 'pending';
         const currency = invoice.currency ? String(invoice.currency).toUpperCase() : 'EUR';
         const amount = formatCurrency((invoice.amountCents || 0) / 100, currency);
         const requestedBy = invoice.user?.email || invoice.billingName || 'Unknown';
         const createdAt = formatDate(invoice.createdAt);
         const dueDate = formatDate(invoice.dueDate);
-        const actions = status === 'pending'
-          ? `<div class="nm-inline-actions">
-              <button class="nm-btn nm-btn-primary nm-btn-sm" data-invoice-action="paid" data-invoice-id="${invoice.id}">Mark paid</button>
-              <button class="nm-btn nm-btn-ghost nm-btn-sm" data-invoice-action="rejected" data-invoice-id="${invoice.id}">Reject</button>
-            </div>`
-          : `<div class="nm-help">Status: ${status}</div>`;
 
-        return `<div class="nm-invoice-item">
-          <div class="nm-invoice-title">${invoice.invoiceNumber} · ${invoice.planKey} · ${amount}</div>
-          <div class="nm-invoice-meta">Requested by ${requestedBy} · Created ${createdAt} · Due ${dueDate}</div>
-          ${actions}
-        </div>`;
-      }).join('');
+        const item = document.createElement('div');
+        item.className = 'nm-invoice-item';
 
-      invoiceApprovals.querySelectorAll('[data-invoice-action]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          const invoiceId = button.getAttribute('data-invoice-id');
-          const status = button.getAttribute('data-invoice-action');
-          if (!invoiceId || !status) return;
-          if (invoiceStatus) invoiceStatus.textContent = 'Updating invoice...';
-          const response = await fetch(`/api/admin/org/invoices/${invoiceId}`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ status })
+        const title = document.createElement('div');
+        title.className = 'nm-invoice-title';
+        title.textContent = `${invoice.invoiceNumber} · ${invoice.planKey} · ${amount}`;
+
+        const meta = document.createElement('div');
+        meta.className = 'nm-invoice-meta';
+        meta.textContent = `Requested by ${requestedBy} · Created ${createdAt} · Due ${dueDate}`;
+
+        item.appendChild(title);
+        item.appendChild(meta);
+
+        if (status === 'pending') {
+          const actions = document.createElement('div');
+          actions.className = 'nm-inline-actions';
+
+          const paidBtn = document.createElement('button');
+          paidBtn.className = 'nm-btn nm-btn-primary nm-btn-sm';
+          paidBtn.type = 'button';
+          paidBtn.textContent = 'Mark paid';
+          paidBtn.addEventListener('click', async () => {
+            if (invoiceStatus) invoiceStatus.textContent = 'Updating invoice...';
+            const response = await fetch(`/api/admin/org/invoices/${invoice.id}`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ status: 'paid' })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              if (invoiceStatus) invoiceStatus.textContent = data.error || 'Failed to update invoice.';
+              return;
+            }
+            if (invoiceStatus) invoiceStatus.textContent = 'Invoice updated.';
+            loadInvoices();
           });
-          const data = await response.json().catch(() => ({}));
-          if (!response.ok) {
-            if (invoiceStatus) invoiceStatus.textContent = data.error || 'Failed to update invoice.';
-            return;
-          }
-          if (invoiceStatus) invoiceStatus.textContent = 'Invoice updated.';
-          loadInvoices();
-        });
+
+          const rejectBtn = document.createElement('button');
+          rejectBtn.className = 'nm-btn nm-btn-ghost nm-btn-sm';
+          rejectBtn.type = 'button';
+          rejectBtn.textContent = 'Reject';
+          rejectBtn.addEventListener('click', async () => {
+            if (invoiceStatus) invoiceStatus.textContent = 'Updating invoice...';
+            const response = await fetch(`/api/admin/org/invoices/${invoice.id}`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({ status: 'rejected' })
+            });
+            const data = await response.json().catch(() => ({}));
+            if (!response.ok) {
+              if (invoiceStatus) invoiceStatus.textContent = data.error || 'Failed to update invoice.';
+              return;
+            }
+            if (invoiceStatus) invoiceStatus.textContent = 'Invoice updated.';
+            loadInvoices();
+          });
+
+          actions.appendChild(paidBtn);
+          actions.appendChild(rejectBtn);
+          item.appendChild(actions);
+        } else {
+          const statusEl = document.createElement('div');
+          statusEl.className = 'nm-help';
+          statusEl.textContent = `Status: ${status}`;
+          item.appendChild(statusEl);
+        }
+
+        invoiceApprovals.appendChild(item);
       });
     };
 

@@ -460,7 +460,11 @@
   const loadBankDetails = async () => {
     if (bankFields.length === 0) return;
     try {
-      const response = await fetch('/api/billing/bank-details');
+      const response = await fetch('/api/billing/bank-details', { headers });
+      if (response.status === 401) {
+        handleUnauthorized(response);
+        return;
+      }
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         bankFields.forEach((field) => {

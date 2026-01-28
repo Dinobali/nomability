@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { prisma } from '../lib/db.js';
 import { env } from '../config/env.js';
-import { generateToken, hashPassword, hashToken, verifyPassword } from '../lib/auth.js';
+import { generateToken, hashPassword, hashToken, verifyPassword, isStrongPassword, PASSWORD_POLICY_MESSAGE } from '../lib/auth.js';
 import { sendMail } from '../lib/email.js';
 
 const issueJwt = (app: FastifyInstance, userId: string, orgId?: string | null) => {
@@ -13,6 +13,9 @@ export const authRoutes = async (app: FastifyInstance) => {
     const body = req.body as { email?: string; password?: string; name?: string; orgName?: string };
     if (!body.email || !body.password) {
       return reply.status(400).send({ error: 'Email and password are required.' });
+    }
+    if (!isStrongPassword(body.password)) {
+      return reply.status(400).send({ error: PASSWORD_POLICY_MESSAGE });
     }
 
     const existing = await prisma.user.findUnique({ where: { email: body.email } });
@@ -152,6 +155,9 @@ export const authRoutes = async (app: FastifyInstance) => {
     const body = req.body as { token?: string; password?: string };
     if (!body.token || !body.password) {
       return reply.status(400).send({ error: 'Token and password are required.' });
+    }
+    if (!isStrongPassword(body.password)) {
+      return reply.status(400).send({ error: PASSWORD_POLICY_MESSAGE });
     }
 
     const tokenHash = hashToken(body.token);
@@ -336,8 +342,8 @@ export const authRoutes = async (app: FastifyInstance) => {
       return reply.status(400).send({ error: 'Current password and new password are required.' });
     }
 
-    if (body.newPassword.length < 8) {
-      return reply.status(400).send({ error: 'Password must be at least 8 characters.' });
+    if (!isStrongPassword(body.newPassword)) {
+      return reply.status(400).send({ error: PASSWORD_POLICY_MESSAGE });
     }
 
     const user = await prisma.user.findUnique({

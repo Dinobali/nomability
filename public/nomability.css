@@ -663,6 +663,76 @@ body.nm-modal-open {
   padding: 50px 0 80px;
 }
 
+.nm-page-app .nm-app-shell {
+  padding-top: 10px;
+}
+
+.nm-studio-layout {
+  display: grid;
+  gap: 26px;
+  grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.nm-studio-sidebar {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+}
+
+.nm-studio-sidebar h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+}
+
+.nm-studio-nav {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.nm-studio-nav-group {
+  display: grid;
+  gap: 10px;
+}
+
+.nm-studio-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--nm-muted);
+}
+
+.nm-studio-link {
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.45);
+  color: var(--nm-mist);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.nm-studio-link:hover {
+  border-color: rgba(34, 211, 238, 0.45);
+}
+
+.nm-studio-link.is-active {
+  background: rgba(34, 211, 238, 0.18);
+  border-color: rgba(34, 211, 238, 0.55);
+  color: var(--nm-foam);
+  box-shadow: 0 14px 28px rgba(2, 6, 23, 0.35);
+}
+
+.nm-studio-panels {
+  min-width: 0;
+}
+
 .nm-app-grid {
   display: grid;
   gap: 26px;
@@ -833,6 +903,16 @@ body.nm-modal-open {
 .nm-live-timestamp {
   color: var(--nm-muted);
   font-size: 0.75rem;
+}
+
+@media (max-width: 980px) {
+  .nm-studio-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .nm-studio-sidebar {
+    position: static;
+  }
 }
 
 .nm-pricing-hero {

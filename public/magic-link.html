@@ -37,7 +37,17 @@
     const form = document.getElementById('magic-form');
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
-    const redirectTo = params.get('redirect') || 'app.html';
+    const sanitizeRedirect = (value, fallback) => {
+      if (!value) return fallback;
+      try {
+        const url = new URL(value, window.location.origin);
+        if (url.origin !== window.location.origin) return fallback;
+        return `${url.pathname}${url.search}${url.hash}`;
+      } catch (error) {
+        return fallback;
+      }
+    };
+    const redirectTo = sanitizeRedirect(params.get('redirect'), 'app.html');
 
     const verifyToken = async () => {
       statusEl.textContent = 'Verifying magic link...';

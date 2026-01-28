@@ -121,7 +121,20 @@ export const billingRoutes = async (app: FastifyInstance) => {
     });
   });
 
-  app.get('/api/billing/bank-details', async (_req, reply) => {
+  app.get('/api/billing/bank-details', { preHandler: app.authenticate }, async (req, reply) => {
+    const user = req.user as { orgId?: string };
+    if (!user.orgId) {
+      return reply.status(400).send({ error: 'Organization not found.' });
+    }
+    const invoice = await prisma.invoiceRequest.findFirst({
+      where: {
+        orgId: user.orgId,
+        status: { in: ['pending', 'paid'] }
+      }
+    });
+    if (!invoice) {
+      return reply.status(403).send({ error: 'Bank details are available after requesting an invoice.' });
+    }
     const bank = {
       accountHolder: env.BANK_ACCOUNT_HOLDER,
       iban: env.BANK_IBAN,

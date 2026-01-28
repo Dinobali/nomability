@@ -12,3 +12,15 @@ export const verifyPassword = (password: string, hash: string) => bcrypt.compare
 export const generateToken = () => nanoid(32);
 
 export const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
+
+export const PASSWORD_POLICY_MESSAGE =
+  'Password must be at least 12 characters and include uppercase, lowercase, number, and symbol.';
+
+export const isStrongPassword = (password: string) => {
+  if (password.length < 12) return false;
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  const hasSymbol = /[^A-Za-z0-9]/.test(password);
+  return hasUpper && hasLower && hasNumber && hasSymbol;
+};

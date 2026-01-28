@@ -197,8 +197,15 @@
   }
 
   if (bankFields.length > 0) {
-    fetch('/api/billing/bank-details')
-      .then((response) => response.json())
+    const token = localStorage.getItem('nmAuthToken');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    fetch('/api/billing/bank-details', { headers })
+      .then((response) => {
+        if (response.status === 401 || response.status === 403) {
+          throw new Error('unauthorized');
+        }
+        return response.json();
+      })
       .then((data) => {
         const bank = data.bank || {};
         bankFields.forEach((field) => {
@@ -207,9 +214,11 @@
           field.textContent = bank[key] || 'Not available';
         });
       })
-      .catch(() => {
+      .catch((error) => {
         bankFields.forEach((field) => {
-          field.textContent = 'Not available';
+          field.textContent = error?.message === 'unauthorized'
+            ? 'Sign in to view bank details.'
+            : 'Not available';
         });
       });
   }

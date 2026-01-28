@@ -3,48 +3,9 @@
   const livePanel = document.querySelector('[data-live-panel]');
   if (!recordingPanel && !livePanel) return;
 
-  const JOBS_KEY = 'nmApiBase';
-  const LIVE_WS_KEY = 'nmWhisperLiveWs';
-  const LEGACY_LIVE_WS_KEY = 'realtimeEndpoint';
-
-  const primaryApiInput = document.getElementById('api-base');
-
-  const normalizeBase = (value) => (value || '').trim().replace(/\/+$/, '');
-  const normalizeWs = (value) => (value || '').trim().replace(/\/+$/, '');
-
-  const getStoredValue = (keys, normalizer) => {
-    for (const key of keys) {
-      const stored = localStorage.getItem(key);
-      const normalized = normalizer(stored);
-      if (normalized) return normalized;
-    }
-    return '';
-  };
-
-  const bindInput = (input, storageKey, normalizer, fallbackKeys = []) => {
-    if (!input) return '';
-    const stored = getStoredValue([storageKey, ...fallbackKeys], normalizer);
-    if (stored) input.value = stored;
-    const save = () => {
-      const value = normalizer(input.value);
-      if (value) {
-        localStorage.setItem(storageKey, value);
-      } else {
-        localStorage.removeItem(storageKey);
-      }
-    };
-    input.addEventListener('change', save);
-    input.addEventListener('blur', save);
-    return stored;
-  };
-
-  const getPrimaryApiBase = () => {
-    const direct = normalizeBase(primaryApiInput?.value);
-    if (direct) return direct;
-    const placeholder = normalizeBase(primaryApiInput?.placeholder);
-    if (placeholder) return placeholder;
-    return normalizeBase(window.location.origin);
-  };
+  const AI_BASE_URL = 'https://ai.nomability.net';
+  const JOBS_BASE_URL = window.location.origin;
+  const WHISPERLIVE_WS_URL = 'wss://ai.nomability.net/ws/whisperlive';
 
   const getAuthHeaders = () => {
     const token = localStorage.getItem('nmAuthToken');
@@ -58,6 +19,27 @@
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+
+  const downloadFile = ({ content, filename, mime }) => {
+    if (!content) return false;
+    const blob = new Blob([content], { type: mime || 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || 'nomability-output.txt';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    return true;
+  };
+
+  const normalizeOutput = (value, placeholder) => {
+    const text = String(value || '').trim();
+    if (!text) return '';
+    if (placeholder && text === placeholder.trim()) return '';
+    return text;
+  };
 
   const streamTranscription = async ({ base, blob, model, language, onUpdate, onReady }) => {
     const formData = new FormData();
@@ -275,10 +257,11 @@
     const recLanguage = recordingPanel.querySelector('[data-rec-language]');
     const recTargetLanguage = recordingPanel.querySelector('[data-rec-target-language]');
     const recSummaryStyle = recordingPanel.querySelector('[data-rec-summary-style]');
-    const recApiBase = recordingPanel.querySelector('[data-rec-api-base]');
-    const recJobBase = recordingPanel.querySelector('[data-rec-job-base]');
     const recTaskTranslate = recordingPanel.querySelector('[data-rec-task="translate"]');
     const recTaskSummarize = recordingPanel.querySelector('[data-rec-task="summarize"]');
+    const recDownloadButtons = Array.from(
+      recordingPanel.querySelectorAll('[data-rec-download]')
+    );
 
     const recTabs = Array.from(recordingPanel.querySelectorAll('[data-rec-tab]'));
     const recPanels = Array.from(recordingPanel.querySelectorAll('[data-rec-panel]'));
@@ -289,25 +272,6 @@
     };
 
     if (!recStart || !recStop || !recProcess || !recTimer || !outputs.transcript) return;
-
-    bindInput(recApiBase, JOBS_KEY, normalizeBase);
-    bindInput(recJobBase, JOBS_KEY, normalizeBase);
-
-    const syncRecApiBase = () => {
-      if (!recApiBase) return;
-      const base = getPrimaryApiBase();
-      if (base && recApiBase.value !== base) {
-        recApiBase.value = base;
-      }
-      if (primaryApiInput?.placeholder && !recApiBase.placeholder) {
-        recApiBase.placeholder = primaryApiInput.placeholder;
-      }
-    };
-
-    if (primaryApiInput) {
-      primaryApiInput.addEventListener('change', syncRecApiBase);
-      primaryApiInput.addEventListener('blur', syncRecApiBase);
-    }
 
     let recorder = null;
     let recordStream = null;
@@ -323,6 +287,7 @@
     let transcriptError = false;
     let progressTimer = null;
     let progressValue = 0;
+    let recRawResult = null;
 
     const defaultTranscript = outputs.transcript.textContent || 'Record audio to see a streaming transcript.';
     const defaultSummary = outputs.summary?.textContent || 'Summaries appear after processing.';
@@ -373,6 +338,95 @@
       if (outputs.translation) outputs.translation.textContent = defaultTranslation;
     };
 
+    const getRecOutputs = () => ({
+      transcript: normalizeOutput(outputs.transcript?.textContent, defaultTranscript),
+      summary: normalizeOutput(outputs.summary?.textContent, defaultSummary),
+      translation: normalizeOutput(outputs.translation?.textContent, defaultTranslation)
+    });
+
+    const updateRecResult = (updates) => {
+      recRawResult = { ...(recRawResult || {}), ...(updates || {}) };
+    };
+
+    const getRecDownloadPayload = (type) => {
+      const { transcript, summary, translation } = getRecOutputs();
+      const translationText =
+        translation ||
+        recRawResult?.translation?.text ||
+        recRawResult?.translation ||
+        recRawResult?.translated_text ||
+        recRawResult?.translatedText ||
+        '';
+      const summaryText =
+        summary ||
+        recRawResult?.summary ||
+        recRawResult?.summaryText ||
+        recRawResult?.summarized_text ||
+        '';
+      const transcriptText = transcript || recRawResult?.transcript || recRawResult?.text || '';
+
+      if (type === 'json') {
+        const payload = recRawResult
+          ? {
+              ...recRawResult,
+              transcript: transcriptText || recRawResult.transcript || recRawResult.text || '',
+              summary: summaryText || recRawResult.summary || recRawResult.summaryText || '',
+              translation: translationText || recRawResult.translation || ''
+            }
+          : {
+              transcript: transcriptText,
+              summary: summaryText,
+              translation: translationText
+            };
+        return {
+          content: JSON.stringify(payload, null, 2),
+          filename: 'nomability-recording.json',
+          mime: 'application/json'
+        };
+      }
+
+      if (type === 'translation') {
+        return {
+          content: translationText,
+          filename: 'nomability-translation.txt',
+          mime: 'text/plain'
+        };
+      }
+
+      if (type === 'summary') {
+        return {
+          content: summaryText,
+          filename: 'nomability-summary.txt',
+          mime: 'text/plain'
+        };
+      }
+
+      if (type === 'subtitles') {
+        const subtitles =
+          recRawResult?.subtitles?.srt || recRawResult?.subtitles || recRawResult?.srt || '';
+        return {
+          content: subtitles,
+          filename: 'nomability-subtitles.srt',
+          mime: 'text/plain'
+        };
+      }
+
+      return {
+        content: transcriptText,
+        filename: 'nomability-transcript.txt',
+        mime: 'text/plain'
+      };
+    };
+
+    recDownloadButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const payload = getRecDownloadPayload(button.dataset.recDownload);
+        if (!downloadFile(payload)) {
+          setStatus('No output available for download.');
+        }
+      });
+    });
+
     const updateButtons = () => {
       const hasOutput = outputs.transcript.textContent !== defaultTranscript;
       recProcess.disabled = !audioBlob || isProcessing;
@@ -416,6 +470,7 @@
         });
         audioChunks = [];
         audioBlob = null;
+        recRawResult = null;
         cleanupAudio();
         recStart.disabled = true;
         recStop.disabled = false;
@@ -468,6 +523,7 @@
       if (recorder) stopRecording();
       audioChunks = [];
       audioBlob = null;
+      recRawResult = null;
       cleanupAudio();
       resetTimer();
       clearInterval(progressTimer);
@@ -481,13 +537,10 @@
 
     const processRecording = async () => {
       if (!audioBlob || isProcessing) return;
-      const base = normalizeBase(recApiBase?.value) || getPrimaryApiBase();
-      if (!base) {
-        setStatus('Set FastWhisperAPI base URL');
-        return;
-      }
+      const base = AI_BASE_URL;
 
       isProcessing = true;
+      recRawResult = null;
       extrasPending = false;
       transcriptPending = true;
       extrasError = false;
@@ -512,20 +565,10 @@
         tasks.translate = false;
       }
 
-      const resolveJobBase = () =>
-        normalizeBase(recJobBase?.value) || getStoredValue([JOBS_KEY], normalizeBase) || getPrimaryApiBase();
+      const resolveJobBase = () => JOBS_BASE_URL;
 
       const runExtrasJob = () => {
         const jobBase = resolveJobBase();
-        if (!jobBase) {
-          if (tasks.translate && outputs.translation) {
-            outputs.translation.textContent = 'Set a Nomability API base URL to translate.';
-          }
-          if (tasks.summarize && outputs.summary) {
-            outputs.summary.textContent = 'Set a Nomability API base URL to summarize.';
-          }
-          return null;
-        }
         extrasPending = true;
         return submitExtrasJob({
           jobBase,
@@ -538,6 +581,7 @@
         })
           .then((result) => {
             renderExtras(outputs, result, tasks);
+            updateRecResult(result);
           })
           .catch((error) => {
             const message = error?.message || 'Extras failed.';
@@ -563,11 +607,6 @@
 
       const runJobsOnly = async () => {
         const jobBase = resolveJobBase();
-        if (!jobBase) {
-          setStatus('Set API base URL');
-          stopProgress();
-          return;
-        }
         setStatus('Uploading');
         try {
           const result = await submitExtrasJob({
@@ -580,6 +619,7 @@
             tasks
           });
           renderExtras(outputs, result, tasks);
+          updateRecResult(result);
           setStatus('Completed');
         } catch (error) {
           setStatus('Transcription failed');
@@ -599,6 +639,7 @@
           language: recLanguage?.value || '',
           onUpdate: (text) => {
             outputs.transcript.textContent = text;
+            updateRecResult({ transcript: text });
           },
           onReady: () => {
             if (tasks.translate || tasks.summarize) {
@@ -644,7 +685,6 @@
     recProcess.addEventListener('click', processRecording);
     recClear.addEventListener('click', clearRecording);
 
-    syncRecApiBase();
     clearRecording();
   };
 
@@ -655,14 +695,14 @@
     const liveClear = livePanel.querySelector('[data-live-clear]');
     const liveStatus = livePanel.querySelector('[data-live-status]');
     const liveOutput = livePanel.querySelector('[data-live-output]');
-    const liveWsInput = livePanel.querySelector('[data-live-ws]');
     const liveLanguage = livePanel.querySelector('[data-live-language]');
     const liveModel = livePanel.querySelector('[data-live-model]');
     const liveVad = livePanel.querySelector('[data-live-vad]');
+    const liveDownloadButtons = Array.from(
+      livePanel.querySelectorAll('[data-live-download]')
+    );
 
-    if (!liveStart || !liveStop || !liveOutput || !liveWsInput) return;
-
-    bindInput(liveWsInput, LIVE_WS_KEY, normalizeWs, [LEGACY_LIVE_WS_KEY]);
+    if (!liveStart || !liveStop || !liveOutput) return;
 
     let liveActive = false;
     let liveStream = null;
@@ -701,6 +741,64 @@
       livePartial = '';
       updateLiveOutput();
     };
+
+    const getLiveTranscriptText = () => {
+      if (!liveFinal) return '';
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = liveFinal;
+      return (wrapper.textContent || '').trim();
+    };
+
+    const getLiveDownloadPayload = (type) => {
+      const transcriptText = getLiveTranscriptText();
+      if (type === 'json') {
+        const payload = {
+          transcript: transcriptText,
+          model: liveModel?.value || 'base',
+          language: (liveLanguage?.value || '').trim() || null
+        };
+        return {
+          content: JSON.stringify(payload, null, 2),
+          filename: 'nomability-live.json',
+          mime: 'application/json'
+        };
+      }
+      if (type === 'translation') {
+        return {
+          content: '',
+          filename: 'nomability-translation.txt',
+          mime: 'text/plain'
+        };
+      }
+      if (type === 'summary') {
+        return {
+          content: '',
+          filename: 'nomability-summary.txt',
+          mime: 'text/plain'
+        };
+      }
+      if (type === 'subtitles') {
+        return {
+          content: '',
+          filename: 'nomability-subtitles.srt',
+          mime: 'text/plain'
+        };
+      }
+      return {
+        content: transcriptText,
+        filename: 'nomability-live-transcript.txt',
+        mime: 'text/plain'
+      };
+    };
+
+    liveDownloadButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const payload = getLiveDownloadPayload(button.dataset.liveDownload);
+        if (!downloadFile(payload)) {
+          setLiveStatus('No output available for download.');
+        }
+      });
+    });
 
     const downsampleBuffer = (buffer, inputSampleRate, outputSampleRate) => {
       if (outputSampleRate >= inputSampleRate) {
@@ -774,11 +872,7 @@
 
     const startLive = async () => {
       if (liveActive) return;
-      const wsValue = normalizeWs(liveWsInput.value) || getStoredValue([LIVE_WS_KEY, LEGACY_LIVE_WS_KEY], normalizeWs);
-      if (!wsValue) {
-        setLiveStatus('Set WhisperLive WebSocket');
-        return;
-      }
+      const wsValue = WHISPERLIVE_WS_URL;
       let wsUrl;
       try {
         wsUrl = new URL(wsValue);
@@ -787,7 +881,7 @@
         return;
       }
       if (wsUrl.protocol !== 'ws:' && wsUrl.protocol !== 'wss:') {
-        setLiveStatus('WebSocket must start with ws:// or wss://');
+        setLiveStatus('WebSocket must be wss://ai.nomability.net/ws/whisperlive');
         return;
       }
 

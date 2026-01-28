@@ -44,7 +44,17 @@
     const form = document.getElementById('login-form');
     const statusEl = document.getElementById('login-status');
     const params = new URLSearchParams(window.location.search);
-    const redirectTo = params.get('redirect') || 'app.html';
+    const sanitizeRedirect = (value, fallback) => {
+      if (!value) return fallback;
+      try {
+        const url = new URL(value, window.location.origin);
+        if (url.origin !== window.location.origin) return fallback;
+        return `${url.pathname}${url.search}${url.hash}`;
+      } catch (error) {
+        return fallback;
+      }
+    };
+    const redirectTo = sanitizeRedirect(params.get('redirect'), 'app.html');
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();

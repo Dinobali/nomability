@@ -8,8 +8,6 @@
   const progressBar = document.querySelector('[data-progress-bar]');
   const progressLabel = document.querySelector('[data-progress-label]');
   const statusLabel = document.querySelector('[data-status]');
-  const apiInput = document.getElementById('api-base');
-  const ollamaInput = document.getElementById('ollama-base');
 
   const outputPanels = {
     transcript: document.querySelector('[data-output="transcript"]'),
@@ -30,79 +28,8 @@
   let pollDelayMs = 2000;
   let pollAttempts = 0;
 
-  const API_STORAGE_KEY = 'nmApiBase';
-  const LEGACY_STORAGE_KEY = 'apiEndpoint';
-  const OLLAMA_STORAGE_KEY = 'nmOllamaBase';
-  const normalizeApiBase = (value) => (value || '').trim().replace(/\/+$/, '');
-  const deriveOllamaBase = (base) => {
-    const fallback = 'http://localhost:11434';
-    if (!base) return fallback;
-    try {
-      const url = new URL(base);
-      url.port = '11434';
-      url.pathname = '';
-      url.search = '';
-      url.hash = '';
-      return normalizeApiBase(url.toString());
-    } catch (error) {
-      return fallback;
-    }
-  };
-  const queryApiBase = normalizeApiBase(new URLSearchParams(window.location.search).get('apiBase'));
-  const storedApiBase = normalizeApiBase(
-    localStorage.getItem(API_STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY)
-  );
-  const defaultApiBase = normalizeApiBase(
-    apiInput?.dataset.defaultApiBase || apiInput?.value
-  );
-  let apiBase = queryApiBase || storedApiBase || defaultApiBase || window.location.origin;
-  const queryOllamaBase = normalizeApiBase(new URLSearchParams(window.location.search).get('ollamaBase'));
-  const storedOllamaBase = normalizeApiBase(localStorage.getItem(OLLAMA_STORAGE_KEY));
-  const defaultOllamaBase = normalizeApiBase(
-    ollamaInput?.dataset.defaultOllamaBase || ollamaInput?.value
-  );
-  let ollamaBase = queryOllamaBase || storedOllamaBase || defaultOllamaBase || deriveOllamaBase(apiBase);
-
-  const syncApiInput = () => {
-    if (!apiInput) return;
-    apiInput.value = queryApiBase || storedApiBase || defaultApiBase || '';
-    apiInput.placeholder = window.location.origin;
-  };
-
-  const syncOllamaInput = () => {
-    if (!ollamaInput) return;
-    const fallback = deriveOllamaBase(apiBase);
-    ollamaInput.value = queryOllamaBase || storedOllamaBase || defaultOllamaBase || fallback;
-    ollamaInput.placeholder = fallback;
-  };
-
-  const updateApiBase = (value) => {
-    const normalized = normalizeApiBase(value);
-    if (normalized) {
-      localStorage.setItem(API_STORAGE_KEY, normalized);
-    } else {
-      localStorage.removeItem(API_STORAGE_KEY);
-    }
-    apiBase = normalized || window.location.origin;
-    if (ollamaInput && !queryOllamaBase && !localStorage.getItem(OLLAMA_STORAGE_KEY)) {
-      const fallback = deriveOllamaBase(apiBase);
-      if (!ollamaInput.value) {
-        ollamaInput.value = fallback;
-      }
-      ollamaInput.placeholder = fallback;
-      ollamaBase = normalizeApiBase(ollamaInput.value) || fallback;
-    }
-  };
-
-  const updateOllamaBase = (value) => {
-    const normalized = normalizeApiBase(value);
-    if (normalized) {
-      localStorage.setItem(OLLAMA_STORAGE_KEY, normalized);
-    } else {
-      localStorage.removeItem(OLLAMA_STORAGE_KEY);
-    }
-    ollamaBase = normalized || deriveOllamaBase(apiBase);
-  };
+  const apiBase = window.location.origin;
+  const ollamaBase = 'https://ai.nomability.net/ollama';
 
   const updateProgress = (value) => {
     progressValue = value;
@@ -276,7 +203,7 @@
 
   const translateWithOllama = async (text, targetLanguage, sourceLanguage) => {
     if (!ollamaBase) {
-      throw new Error('Ollama base URL is not set');
+      throw new Error('Translation service is not configured');
     }
     const response = await fetch(`${ollamaBase}/api/generate`, {
       method: 'POST',
@@ -449,7 +376,7 @@
       }
     } catch (error) {
       stopProgress();
-      setStatus('Request failed. Check the API base URL.');
+      setStatus('Request failed. Please try again.');
     }
   });
 
@@ -472,12 +399,64 @@
 
   if (tabs.length) activateTab(tabs[0].dataset.tabTarget);
 
+  const studioNav = Array.from(document.querySelectorAll('[data-studio-nav]'));
+  const studioPanels = Array.from(document.querySelectorAll('[data-studio-panel]'));
+  const activateStudioPanel = (name, shouldFocus = false) => {
+    studioNav.forEach((button) => {
+      const isActive = button.dataset.studioNav === name;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-selected', String(isActive));
+    });
+    studioPanels.forEach((panel) => {
+      const isActive = panel.dataset.studioPanel === name;
+      panel.hidden = !isActive;
+      panel.classList.toggle('is-active', isActive);
+    });
+    if (shouldFocus) {
+      const panel = studioPanels.find((item) => item.dataset.studioPanel === name);
+      const focusable = panel?.querySelector('button, [href], input, select, textarea');
+      if (focusable) focusable.focus();
+    }
+  };
+
+  if (studioNav.length && studioPanels.length) {
+    const hash = (window.location.hash || '').replace('#', '');
+    const hashTarget = studioPanels.find(
+      (panel) => panel.id === hash || panel.dataset.studioPanel === hash
+    );
+    const initial = hashTarget?.dataset.studioPanel || studioNav[0].dataset.studioNav;
+    activateStudioPanel(initial);
+    studioNav.forEach((button) => {
+      button.addEventListener('click', () => activateStudioPanel(button.dataset.studioNav, true));
+    });
+  }
+
   const getDownloadPayload = (type) => {
+    const translationText =
+      currentResult.translation?.text ||
+      currentResult.translation ||
+      currentResult.translated_text ||
+      currentResult.translatedText ||
+      '';
     if (type === 'json') {
       return {
         content: JSON.stringify(currentResult || {}, null, 2),
         filename: 'nomability-result.json',
         mime: 'application/json'
+      };
+    }
+    if (type === 'translation') {
+      return {
+        content: translationText,
+        filename: 'nomability-translation.txt',
+        mime: 'text/plain'
+      };
+    }
+    if (type === 'summary') {
+      return {
+        content: currentResult.summary || currentResult.summaryText || currentResult.summarized_text || '',
+        filename: 'nomability-summary.txt',
+        mime: 'text/plain'
       };
     }
     if (type === 'subtitles') {
@@ -526,18 +505,6 @@
   if (glossaryToggle) {
     glossaryToggle.addEventListener('change', syncGlossaryState);
     syncGlossaryState();
-  }
-
-  if (apiInput) {
-    syncApiInput();
-    apiInput.addEventListener('change', () => updateApiBase(apiInput.value));
-    apiInput.addEventListener('blur', () => updateApiBase(apiInput.value));
-  }
-
-  if (ollamaInput) {
-    syncOllamaInput();
-    ollamaInput.addEventListener('change', () => updateOllamaBase(ollamaInput.value));
-    ollamaInput.addEventListener('blur', () => updateOllamaBase(ollamaInput.value));
   }
 
   const setActiveFiles = (files) => {

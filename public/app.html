@@ -27,7 +27,7 @@
   <script defer src="nomability-app.js"></script>
   <script defer src="nomability-live.js"></script>
 </head>
-<body>
+<body class="nm-page-app">
   <header class="nm-header">
     <div class="nm-wrap nm-nav">
       <a class="nm-logo" href="/">Nomability</a>
@@ -84,280 +84,304 @@
 
   <main class="nm-app-shell">
     <div class="nm-wrap">
-      <div class="nm-reveal" data-reveal>
-        <h1 class="nm-section-title">Nomability Studio</h1>
-        <p class="nm-section-subtitle">Build multi-step workflows for transcription, translation, summaries, and subtitle delivery.</p>
-      </div>
-
-      <div class="nm-app-grid" style="margin-top: 26px;">
-        <section class="nm-panel nm-reveal" data-reveal>
-          <h2>Create a job</h2>
-          <form id="nm-job-form">
-            <div class="nm-dropzone" data-dropzone>
-              <input id="nm-files" name="files" type="file" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.opus,.flac,.ogg" multiple style="display:none;">
-              <label for="nm-files" style="cursor:pointer; display:block;">
-                <strong>Drop audio or video files here</strong><br>
-                <span style="color: var(--nm-muted);">or click to browse</span>
-              </label>
-              <div class="nm-file-list" data-file-list></div>
+      <div class="nm-studio-layout" style="margin-top: 26px;">
+        <aside class="nm-panel nm-studio-sidebar">
+          <h2>Studio navigation</h2>
+          <p class="nm-help">Jump between features without scrolling the full page.</p>
+          <div class="nm-studio-nav">
+            <div class="nm-studio-nav-group">
+              <span class="nm-studio-label">Features</span>
+              <button class="nm-studio-link is-active" type="button" data-studio-nav="jobs" aria-selected="true" aria-controls="studio-jobs">Batch jobs</button>
+              <button class="nm-studio-link" type="button" data-studio-nav="recording" aria-selected="false" aria-controls="studio-recording">Recording</button>
+              <button class="nm-studio-link" type="button" data-studio-nav="live" aria-selected="false" aria-controls="studio-live">WhisperLive</button>
             </div>
-
-            <div class="nm-divider"></div>
-
-            <div class="nm-toggle-grid">
-              <label class="nm-toggle">Transcribe<input id="task-transcribe" type="checkbox" checked></label>
-              <label class="nm-toggle">Translate<input id="task-translate" type="checkbox"></label>
-              <label class="nm-toggle">Summarize<input id="task-summarize" type="checkbox"></label>
-              <label class="nm-toggle">Diarize<input id="task-diarize" type="checkbox"></label>
-              <label class="nm-toggle">Subtitles<input id="task-subtitle" type="checkbox" checked></label>
-              <label class="nm-toggle">Sync captions<input id="task-sync" type="checkbox"></label>
-              <label class="nm-toggle">Glossary<input id="task-glossary" type="checkbox"></label>
+            <div class="nm-studio-nav-group">
+              <span class="nm-studio-label">Users</span>
+              <button class="nm-studio-link" type="button" data-studio-nav="users" aria-selected="false" aria-controls="studio-users">Users & access</button>
             </div>
-
-            <div class="nm-divider"></div>
-
-            <div class="nm-grid nm-grid-2">
-              <div class="nm-field">
-                <label for="model">Model</label>
-                <select id="model" class="nm-select">
-                  <option value="tiny">tiny</option>
-                  <option value="base" selected>base</option>
-                  <option value="small">small</option>
-                  <option value="medium">medium</option>
-                  <option value="large">large</option>
-                </select>
-              </div>
-              <div class="nm-field">
-                <label for="language">Source language</label>
-                <input id="language" class="nm-input" placeholder="auto" />
-              </div>
-              <div class="nm-field">
-                <label for="target-language">Target language</label>
-                <input id="target-language" class="nm-input" placeholder="en, de, fr" />
-              </div>
-              <div class="nm-field">
-                <label for="summary-style">Summary style</label>
-                <select id="summary-style" class="nm-select">
-                  <option value="bullet">Bullet highlights</option>
-                  <option value="executive">Executive summary</option>
-                  <option value="action">Action items</option>
-                </select>
-              </div>
-              <div class="nm-field">
-                <label for="speaker-count">Speaker count</label>
-                <select id="speaker-count" class="nm-select">
-                  <option value="auto">Auto-detect</option>
-                  <option value="1">1 speaker</option>
-                  <option value="2">2 speakers</option>
-                  <option value="3">3+ speakers</option>
-                </select>
-              </div>
-              <div class="nm-field">
-                <label for="output-format">Primary export</label>
-                <select id="output-format" class="nm-select">
-                  <option value="txt">TXT</option>
-                  <option value="srt">SRT</option>
-                  <option value="vtt">VTT</option>
-                  <option value="json">JSON</option>
-                </select>
-              </div>
-              <div class="nm-field" style="grid-column: 1 / -1;">
-                <label for="api-base">API base URL</label>
-                <input id="api-base" class="nm-input" placeholder="https://api.example.com" />
-                <p class="nm-help">Optional override for the job backend (saved in your browser).</p>
-              </div>
-              <div class="nm-field" style="grid-column: 1 / -1;">
-                <label for="ollama-base">Ollama base URL (translation)</label>
-                <input id="ollama-base" class="nm-input" placeholder="http://localhost:11434" />
-                <p class="nm-help">Used when Translate is enabled and the backend does not return a translation.</p>
-              </div>
-            </div>
-
-            <div class="nm-divider"></div>
-
-            <div class="nm-field">
-              <label for="glossary">Glossary</label>
-              <textarea id="glossary" class="nm-textarea" placeholder="Enable glossary to lock terminology." disabled></textarea>
-            </div>
-
-            <div class="nm-field" style="margin-top: 12px;">
-              <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
-                <input id="timestamps" type="checkbox" checked>
-                Include timestamps
-              </label>
-            </div>
-
-            <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
-              <button class="nm-btn nm-btn-primary" type="submit">Run job</button>
-              <button class="nm-btn nm-btn-ghost" type="button">Save preset</button>
-            </div>
-          </form>
-        </section>
-
-        <section class="nm-panel nm-reveal" data-reveal style="--reveal-delay: 140ms;">
-          <h2>Job status</h2>
-          <div class="nm-status">
-            <span data-status>Idle</span>
-            <span data-progress-label>0%</span>
           </div>
-          <div class="nm-progress" style="margin-top: 10px;">
-            <span data-progress-bar></span>
-          </div>
+        </aside>
 
-          <div class="nm-divider"></div>
+        <div class="nm-studio-panels">
+          <section class="nm-studio-panel" data-studio-panel="jobs" id="studio-jobs">
+            <div class="nm-app-grid">
+              <section class="nm-panel nm-reveal" data-reveal>
+                <h2>Create a job</h2>
+                <form id="nm-job-form">
+                  <div class="nm-dropzone" data-dropzone>
+                    <input id="nm-files" name="files" type="file" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.opus,.flac,.ogg" multiple style="display:none;">
+                    <label for="nm-files" style="cursor:pointer; display:block;">
+                      <strong>Drop audio or video files here</strong><br>
+                      <span style="color: var(--nm-muted);">or click to browse</span>
+                    </label>
+                    <div class="nm-file-list" data-file-list></div>
+                  </div>
 
-          <div class="nm-tabs">
-            <button class="nm-tab" type="button" data-tab-target="transcript">Transcript</button>
-            <button class="nm-tab" type="button" data-tab-target="summary">Summary</button>
-            <button class="nm-tab" type="button" data-tab-target="translation">Translation</button>
-            <button class="nm-tab" type="button" data-tab-target="subtitles">Subtitles</button>
-            <button class="nm-tab" type="button" data-tab-target="json">JSON</button>
-          </div>
+                  <div class="nm-divider"></div>
 
-          <div class="nm-output" data-tab-panel="transcript" data-output="transcript"></div>
-          <div class="nm-output" data-tab-panel="summary" data-output="summary" hidden></div>
-          <div class="nm-output" data-tab-panel="translation" data-output="translation" hidden></div>
-          <div class="nm-output" data-tab-panel="subtitles" data-output="subtitles" hidden></div>
-          <div class="nm-output" data-tab-panel="json" data-output="json" hidden></div>
+                  <div class="nm-toggle-grid">
+                    <label class="nm-toggle">Transcribe<input id="task-transcribe" type="checkbox" checked></label>
+                    <label class="nm-toggle">Translate<input id="task-translate" type="checkbox"></label>
+                    <label class="nm-toggle">Summarize<input id="task-summarize" type="checkbox"></label>
+                    <label class="nm-toggle">Diarize<input id="task-diarize" type="checkbox"></label>
+                    <label class="nm-toggle">Subtitles<input id="task-subtitle" type="checkbox" checked></label>
+                    <label class="nm-toggle">Sync captions<input id="task-sync" type="checkbox"></label>
+                    <label class="nm-toggle">Glossary<input id="task-glossary" type="checkbox"></label>
+                  </div>
 
-          <div class="nm-divider"></div>
-          <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-            <button class="nm-btn nm-btn-ghost" type="button" data-download="transcript">Download TXT</button>
-            <button class="nm-btn nm-btn-ghost" type="button" data-download="subtitles">Download SRT</button>
-            <button class="nm-btn nm-btn-ghost" type="button" data-download="json">Download JSON</button>
-          </div>
-        </section>
-      </div>
+                  <div class="nm-divider"></div>
 
-      <section id="live" class="nm-section" style="padding-top: 60px;">
-        <div class="nm-reveal" data-reveal>
-          <span class="nm-pill">Live capture</span>
-          <h2 class="nm-section-title">Record or stream audio in real time.</h2>
-          <p class="nm-section-subtitle">Record in the browser and stream transcripts as they arrive. Translate or summarize once the transcript is ready, then export or share.</p>
-        </div>
-        <div class="nm-grid nm-grid-2" style="margin-top: 32px;">
-          <section class="nm-panel nm-reveal" data-reveal data-recording-panel>
-            <div class="nm-live-header">
-              <h3>Record and process (FastWhisperAPI)</h3>
-              <span class="nm-chip" data-rec-status>Idle</span>
+                  <div class="nm-grid nm-grid-2">
+                    <div class="nm-field">
+                      <label for="model">Model</label>
+                      <select id="model" class="nm-select">
+                        <option value="tiny">tiny</option>
+                        <option value="base" selected>base</option>
+                        <option value="small">small</option>
+                        <option value="medium">medium</option>
+                        <option value="large">large</option>
+                      </select>
+                    </div>
+                    <div class="nm-field">
+                      <label for="language">Source language</label>
+                      <input id="language" class="nm-input" placeholder="auto" />
+                    </div>
+                    <div class="nm-field">
+                      <label for="target-language">Target language</label>
+                      <input id="target-language" class="nm-input" placeholder="en, de, fr" />
+                    </div>
+                    <div class="nm-field">
+                      <label for="summary-style">Summary style</label>
+                      <select id="summary-style" class="nm-select">
+                        <option value="bullet">Bullet highlights</option>
+                        <option value="executive">Executive summary</option>
+                        <option value="action">Action items</option>
+                      </select>
+                    </div>
+                    <div class="nm-field">
+                      <label for="speaker-count">Speaker count</label>
+                      <select id="speaker-count" class="nm-select">
+                        <option value="auto">Auto-detect</option>
+                        <option value="1">1 speaker</option>
+                        <option value="2">2 speakers</option>
+                        <option value="3">3+ speakers</option>
+                      </select>
+                    </div>
+                    <div class="nm-field">
+                      <label for="output-format">Primary export</label>
+                      <select id="output-format" class="nm-select">
+                        <option value="txt">TXT</option>
+                        <option value="srt">SRT</option>
+                        <option value="vtt">VTT</option>
+                        <option value="json">JSON</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="nm-divider"></div>
+
+                  <div class="nm-field">
+                    <label for="glossary">Glossary</label>
+                    <textarea id="glossary" class="nm-textarea" placeholder="Enable glossary to lock terminology." disabled></textarea>
+                  </div>
+
+                  <div class="nm-field" style="margin-top: 12px;">
+                    <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
+                      <input id="timestamps" type="checkbox" checked>
+                      Include timestamps
+                    </label>
+                  </div>
+
+                  <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+                    <button class="nm-btn nm-btn-primary" type="submit">Run job</button>
+                    <button class="nm-btn nm-btn-ghost" type="button">Save preset</button>
+                  </div>
+                </form>
+              </section>
+
+              <section class="nm-panel nm-reveal" data-reveal style="--reveal-delay: 140ms;">
+                <h2>Job status</h2>
+                <div class="nm-status">
+                  <span data-status>Idle</span>
+                  <span data-progress-label>0%</span>
+                </div>
+                <div class="nm-progress" style="margin-top: 10px;">
+                  <span data-progress-bar></span>
+                </div>
+
+                <div class="nm-divider"></div>
+
+                <div class="nm-tabs">
+                  <button class="nm-tab" type="button" data-tab-target="transcript">Transcript</button>
+                  <button class="nm-tab" type="button" data-tab-target="summary">Summary</button>
+                  <button class="nm-tab" type="button" data-tab-target="translation">Translation</button>
+                  <button class="nm-tab" type="button" data-tab-target="subtitles">Subtitles</button>
+                  <button class="nm-tab" type="button" data-tab-target="json">JSON</button>
+                </div>
+
+                <div class="nm-output" data-tab-panel="transcript" data-output="transcript"></div>
+                <div class="nm-output" data-tab-panel="summary" data-output="summary" hidden></div>
+                <div class="nm-output" data-tab-panel="translation" data-output="translation" hidden></div>
+                <div class="nm-output" data-tab-panel="subtitles" data-output="subtitles" hidden></div>
+                <div class="nm-output" data-tab-panel="json" data-output="json" hidden></div>
+
+                <div class="nm-divider"></div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                  <button class="nm-btn nm-btn-ghost" type="button" data-download="transcript">Download TXT</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-download="translation">Download Translation</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-download="summary">Download Summary</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-download="subtitles">Download SRT</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-download="json">Download JSON</button>
+                </div>
+              </section>
             </div>
-            <p class="nm-help">Capture audio from your microphone and stream the transcript as it is generated.</p>
-            <div class="nm-status" style="margin-top: 10px;">
-              <span>Progress</span>
-              <span data-rec-progress-label>0%</span>
-            </div>
-            <div class="nm-progress">
-              <span data-rec-progress-bar></span>
-            </div>
-            <div class="nm-divider"></div>
-            <div class="nm-live-controls">
-              <button class="nm-btn nm-btn-primary" type="button" data-rec-start>Start recording</button>
-              <button class="nm-btn nm-btn-ghost" type="button" data-rec-stop disabled>Stop</button>
-              <span class="nm-chip" data-rec-timer>00:00</span>
-            </div>
-            <audio class="nm-live-audio" data-rec-audio controls hidden></audio>
-            <div class="nm-divider"></div>
-            <div class="nm-toggle-grid">
-              <label class="nm-toggle">Transcribe<input type="checkbox" checked disabled data-rec-task="transcribe"></label>
-              <label class="nm-toggle">Translate<input type="checkbox" data-rec-task="translate"></label>
-              <label class="nm-toggle">Summarize<input type="checkbox" data-rec-task="summarize"></label>
-            </div>
-            <div class="nm-grid nm-grid-2" style="margin-top: 16px;">
-              <div class="nm-field">
-                <label for="rec-model">Model</label>
-                <select id="rec-model" class="nm-select" data-rec-model>
-                  <option value="tiny">tiny</option>
-                  <option value="base" selected>base</option>
-                  <option value="small">small</option>
-                  <option value="medium">medium</option>
-                  <option value="large">large</option>
-                </select>
-              </div>
-              <div class="nm-field">
-                <label for="rec-language">Language (optional)</label>
-                <input id="rec-language" class="nm-input" placeholder="auto" data-rec-language />
-              </div>
-              <div class="nm-field">
-                <label for="rec-target-language">Target language</label>
-                <input id="rec-target-language" class="nm-input" placeholder="en, de, fr" data-rec-target-language />
-              </div>
-              <div class="nm-field">
-                <label for="rec-summary-style">Summary style</label>
-                <select id="rec-summary-style" class="nm-select" data-rec-summary-style>
-                  <option value="bullet">Bullet highlights</option>
-                  <option value="executive">Executive summary</option>
-                  <option value="action">Action items</option>
-                </select>
-              </div>
-              <div class="nm-field" style="grid-column: 1 / -1;">
-                <label for="rec-api-base">FastWhisperAPI base URL</label>
-                <input id="rec-api-base" class="nm-input" placeholder="http://localhost:8008" data-rec-api-base />
-                <p class="nm-help">Used for streaming transcription.</p>
-              </div>
-              <div class="nm-field" style="grid-column: 1 / -1;">
-                <label for="rec-job-base">Nomability API base URL (optional)</label>
-                <input id="rec-job-base" class="nm-input" placeholder="https://api.example.com" data-rec-job-base />
-                <p class="nm-help">Required for translation and summaries when running jobs.</p>
-              </div>
-            </div>
-            <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
-              <button class="nm-btn nm-btn-primary" type="button" data-rec-process disabled>Process recording</button>
-              <button class="nm-btn nm-btn-ghost" type="button" data-rec-clear disabled>Clear</button>
-            </div>
-            <div class="nm-divider"></div>
-            <div class="nm-tabs">
-              <button class="nm-tab active" type="button" data-rec-tab="transcript">Transcript</button>
-              <button class="nm-tab" type="button" data-rec-tab="summary">Summary</button>
-              <button class="nm-tab" type="button" data-rec-tab="translation">Translation</button>
-            </div>
-            <div class="nm-output nm-output-scroll" data-rec-panel="transcript">Record audio to see a streaming transcript.</div>
-            <div class="nm-output nm-output-scroll" data-rec-panel="summary" hidden>Summaries appear after processing.</div>
-            <div class="nm-output nm-output-scroll" data-rec-panel="translation" hidden>Translations appear after processing.</div>
           </section>
 
-          <section class="nm-panel nm-reveal" data-reveal style="--reveal-delay: 140ms;" data-live-panel>
-            <div class="nm-live-header">
-              <h3>Real-time transcription (WhisperLive)</h3>
-              <span class="nm-chip" data-live-status>Idle</span>
+          <section class="nm-studio-panel" data-studio-panel="recording" id="studio-recording" hidden>
+            <div class="nm-app-grid">
+              <section class="nm-panel nm-reveal" data-reveal data-recording-panel>
+                <div class="nm-live-header">
+                  <h3>Record and process</h3>
+                  <span class="nm-chip" data-rec-status>Idle</span>
+                </div>
+                <p class="nm-help">Capture audio from your microphone and stream the transcript as it is generated.</p>
+                <div class="nm-status" style="margin-top: 10px;">
+                  <span>Progress</span>
+                  <span data-rec-progress-label>0%</span>
+                </div>
+                <div class="nm-progress">
+                  <span data-rec-progress-bar></span>
+                </div>
+                <div class="nm-divider"></div>
+                <div class="nm-live-controls">
+                  <button class="nm-btn nm-btn-primary" type="button" data-rec-start>Start recording</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-rec-stop disabled>Stop</button>
+                  <span class="nm-chip" data-rec-timer>00:00</span>
+                </div>
+                <audio class="nm-live-audio" data-rec-audio controls hidden></audio>
+                <div class="nm-divider"></div>
+                <div class="nm-toggle-grid">
+                  <label class="nm-toggle">Transcribe<input type="checkbox" checked disabled data-rec-task="transcribe"></label>
+                  <label class="nm-toggle">Translate<input type="checkbox" data-rec-task="translate"></label>
+                  <label class="nm-toggle">Summarize<input type="checkbox" data-rec-task="summarize"></label>
+                </div>
+                <div class="nm-grid nm-grid-2" style="margin-top: 16px;">
+                  <div class="nm-field">
+                    <label for="rec-model">Model</label>
+                    <select id="rec-model" class="nm-select" data-rec-model>
+                      <option value="tiny">tiny</option>
+                      <option value="base" selected>base</option>
+                      <option value="small">small</option>
+                      <option value="medium">medium</option>
+                      <option value="large">large</option>
+                    </select>
+                  </div>
+                  <div class="nm-field">
+                    <label for="rec-language">Language (optional)</label>
+                    <input id="rec-language" class="nm-input" placeholder="auto" data-rec-language />
+                  </div>
+                  <div class="nm-field">
+                    <label for="rec-target-language">Target language</label>
+                    <input id="rec-target-language" class="nm-input" placeholder="en, de, fr" data-rec-target-language />
+                  </div>
+                  <div class="nm-field">
+                    <label for="rec-summary-style">Summary style</label>
+                    <select id="rec-summary-style" class="nm-select" data-rec-summary-style>
+                      <option value="bullet">Bullet highlights</option>
+                      <option value="executive">Executive summary</option>
+                      <option value="action">Action items</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button class="nm-btn nm-btn-primary" type="button" data-rec-process disabled>Process recording</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-rec-clear disabled>Clear</button>
+                </div>
+                <div class="nm-divider"></div>
+                <div class="nm-tabs">
+                  <button class="nm-tab active" type="button" data-rec-tab="transcript">Transcript</button>
+                  <button class="nm-tab" type="button" data-rec-tab="summary">Summary</button>
+                  <button class="nm-tab" type="button" data-rec-tab="translation">Translation</button>
+                </div>
+                <div class="nm-output nm-output-scroll" data-rec-panel="transcript">Record audio to see a streaming transcript.</div>
+                <div class="nm-output nm-output-scroll" data-rec-panel="summary" hidden>Summaries appear after processing.</div>
+                <div class="nm-output nm-output-scroll" data-rec-panel="translation" hidden>Translations appear after processing.</div>
+                <div class="nm-divider"></div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                  <button class="nm-btn nm-btn-ghost" type="button" data-rec-download="transcript">Download TXT</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-rec-download="translation">Download Translation</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-rec-download="summary">Download Summary</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-rec-download="subtitles">Download SRT</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-rec-download="json">Download JSON</button>
+                </div>
+              </section>
             </div>
-            <p class="nm-help">Stream microphone audio to WhisperLive over WebSocket and watch the transcript update live.</p>
-            <div class="nm-divider"></div>
-            <div class="nm-grid nm-grid-2">
-              <div class="nm-field">
-                <label for="live-ws">WhisperLive WebSocket</label>
-                <input id="live-ws" class="nm-input" placeholder="ws://localhost:9090" data-live-ws />
-              </div>
-              <div class="nm-field">
-                <label for="live-language">Language (optional)</label>
-                <input id="live-language" class="nm-input" placeholder="auto" data-live-language />
-              </div>
-              <div class="nm-field">
-                <label for="live-model">Model</label>
-                <select id="live-model" class="nm-select" data-live-model>
-                  <option value="tiny">tiny</option>
-                  <option value="base" selected>base</option>
-                  <option value="small">small</option>
-                  <option value="medium">medium</option>
-                  <option value="large">large</option>
-                </select>
-              </div>
-              <div class="nm-field">
-                <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
-                  <input type="checkbox" data-live-vad />
-                  Enable VAD
-                </label>
-              </div>
+          </section>
+
+          <section class="nm-studio-panel" data-studio-panel="live" id="studio-live" hidden>
+            <div class="nm-app-grid">
+              <section class="nm-panel nm-reveal" data-reveal data-live-panel>
+                <div class="nm-live-header">
+                  <h3>Real-time transcription</h3>
+                  <span class="nm-chip" data-live-status>Idle</span>
+                </div>
+                <p class="nm-help">Stream microphone audio to WhisperLive over WebSocket and watch the transcript update live.</p>
+                <div class="nm-divider"></div>
+                <div class="nm-grid nm-grid-2">
+                  <div class="nm-field">
+                    <label for="live-language">Language (optional)</label>
+                    <input id="live-language" class="nm-input" placeholder="auto" data-live-language />
+                  </div>
+                  <div class="nm-field">
+                    <label for="live-model">Model</label>
+                    <select id="live-model" class="nm-select" data-live-model>
+                      <option value="tiny">tiny</option>
+                      <option value="base" selected>base</option>
+                      <option value="small">small</option>
+                      <option value="medium">medium</option>
+                      <option value="large">large</option>
+                    </select>
+                  </div>
+                  <div class="nm-field">
+                    <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
+                      <input type="checkbox" data-live-vad />
+                      Enable VAD
+                    </label>
+                  </div>
+                </div>
+                <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button class="nm-btn nm-btn-primary" type="button" data-live-start>Start live</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-live-stop disabled>Stop</button>
+                  <button class="nm-btn nm-btn-soft" type="button" data-live-clear disabled>Clear</button>
+                </div>
+                <div class="nm-divider"></div>
+                <div class="nm-output nm-output-scroll" data-live-output>Start WhisperLive to see real-time transcription.</div>
+                <div class="nm-divider"></div>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                  <button class="nm-btn nm-btn-ghost" type="button" data-live-download="transcript">Download TXT</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-live-download="translation">Download Translation</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-live-download="summary">Download Summary</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-live-download="subtitles">Download SRT</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-live-download="json">Download JSON</button>
+                </div>
+              </section>
             </div>
-            <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
-              <button class="nm-btn nm-btn-primary" type="button" data-live-start>Start live</button>
-              <button class="nm-btn nm-btn-ghost" type="button" data-live-stop disabled>Stop</button>
-              <button class="nm-btn nm-btn-soft" type="button" data-live-clear disabled>Clear</button>
+          </section>
+
+          <section class="nm-studio-panel" data-studio-panel="users" id="studio-users" hidden>
+            <div class="nm-app-grid">
+              <section class="nm-panel nm-reveal" data-reveal>
+                <h2>Users & access</h2>
+                <p class="nm-help">Manage your profile, billing, and team access from one place.</p>
+                <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <a class="nm-btn nm-btn-primary" href="profile.html">Open profile</a>
+                  <a class="nm-btn nm-btn-ghost" href="admin.html" data-auth-role="admin" hidden>Admin console</a>
+                </div>
+              </section>
             </div>
-            <div class="nm-divider"></div>
-            <div class="nm-output nm-output-scroll" data-live-output>Start WhisperLive to see real-time transcription.</div>
           </section>
         </div>
-      </section>
+      </div>
     </div>
   </main>
   <div class="nm-auth-overlay" data-auth-modal hidden>

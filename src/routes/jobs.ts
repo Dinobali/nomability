@@ -116,8 +116,12 @@ export const jobRoutes = async (app: FastifyInstance) => {
 
   app.get('/api/ai/jobs/:id', { preHandler: app.authenticate }, async (req, reply) => {
     const jobId = (req.params as { id: string }).id;
-    const job = await prisma.job.findUnique({
-      where: { id: jobId }
+    const user = req.user as { orgId?: string };
+    if (env.AUTH_REQUIRED && !user.orgId) {
+      return reply.status(401).send({ error: 'Organization not found.' });
+    }
+    const job = await prisma.job.findFirst({
+      where: env.AUTH_REQUIRED ? { id: jobId, orgId: user.orgId } : { id: jobId }
     });
 
     if (!job) {
