@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verify Nomability Email</title>
+  <link rel="stylesheet" href="nomability.css">
+</head>
+<body>
+  <header class="nm-header">
+    <div class="nm-wrap nm-nav">
+      <a class="nm-logo" href="/">Nomability</a>
+      <div class="nm-nav-actions">
+        <a class="nm-btn nm-btn-ghost" href="login.html">Sign in</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="nm-app-shell">
+    <div class="nm-wrap nm-app-grid">
+      <section class="nm-panel">
+        <h2>Verify your email</h2>
+        <form id="verify-form" class="nm-grid" style="gap: 16px;">
+          <div class="nm-field">
+            <label for="email">Email</label>
+            <input id="email" class="nm-input" type="email" required />
+          </div>
+          <div class="nm-field">
+            <label for="code">Verification code</label>
+            <input id="code" class="nm-input" type="text" inputmode="numeric" autocomplete="one-time-code" required />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Verify email</button>
+          <button class="nm-btn nm-btn-ghost" type="button" id="resend-btn">Resend code</button>
+        </form>
+        <p id="verify-status" class="nm-help" style="margin-top: 12px;"></p>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    const form = document.getElementById('verify-form');
+    const statusEl = document.getElementById('verify-status');
+    const resendBtn = document.getElementById('resend-btn');
+    const emailInput = document.getElementById('email');
+    const codeInput = document.getElementById('code');
+    const params = new URLSearchParams(window.location.search);
+    const sanitizeRedirect = (value, fallback) => {
+      if (!value) return fallback;
+      try {
+        const url = new URL(value, window.location.origin);
+        if (url.origin !== window.location.origin) return fallback;
+        return `${url.pathname}${url.search}${url.hash}`;
+      } catch (error) {
+        return fallback;
+      }
+    };
+    const redirectTo = sanitizeRedirect(params.get('redirect'), 'app.html');
+
+    const verifyEmail = async () => {
+      const email = emailInput.value.trim();
+      const code = codeInput.value.trim();
+      if (!email || !code) {
+        statusEl.textContent = 'Enter your email and the verification code.';
+        return;
+      }
+      statusEl.textContent = 'Verifying...';
+      const response = await fetch('/api/auth/email-verification/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        statusEl.textContent = data.error || 'Verification failed.';
+        return;
+      }
+      if (data.token) {
+        localStorage.setItem('nmAuthToken', data.token);
+        window.location.href = redirectTo;
+        return;
+      }
+      statusEl.textContent = 'Email verified. You can sign in now.';
+    };
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      await verifyEmail();
+    });
+
+    resendBtn.addEventListener('click', async () => {
+      const email = emailInput.value.trim();
+      if (!email) {
+        statusEl.textContent = 'Enter your email to resend a code.';
+        return;
+      }
+      statusEl.textContent = 'Sending verification code...';
+      const response = await fetch('/api/auth/email-verification/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        statusEl.textContent = data.error || 'Failed to send verification code.';
+        return;
+      }
+      statusEl.textContent = 'Verification code sent. Check your inbox.';
+    });
+
+    const emailParam = params.get('email');
+    const codeParam = params.get('code');
+    if (emailParam) emailInput.value = emailParam;
+    if (codeParam) {
+      codeInput.value = codeParam;
+      verifyEmail();
+    }
+  </script>
+</body>
+</html>

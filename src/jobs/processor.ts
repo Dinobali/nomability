@@ -96,7 +96,7 @@ export const processJob = async (jobId: string) => {
 
   let summary: string | undefined;
   if (tasks.summarize && transcript) {
-    summary = await summarizeText(transcript);
+    summary = await summarizeText(transcript, params.summaryStyle || 'bullet');
   }
 
   const resultPayload: Record<string, any> = {

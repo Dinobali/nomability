@@ -381,6 +381,19 @@
           <button class="nm-btn nm-btn-primary" type="submit">Create account</button>
         </form>
         <p class="nm-help" data-auth-status="register" style="margin-top: 10px;"></p>
+        <form data-auth-form="verify" class="nm-grid" style="gap: 16px; margin-top: 16px;" hidden>
+          <div class="nm-field">
+            <label for="auth-verify-email">Email</label>
+            <input id="auth-verify-email" class="nm-input" type="email" required data-auth-input="verify-email" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-verify-code">Verification code</label>
+            <input id="auth-verify-code" class="nm-input" type="text" inputmode="numeric" autocomplete="one-time-code" required data-auth-input="verify-code" />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Verify email</button>
+          <button class="nm-btn nm-btn-ghost" type="button" data-auth-resend>Resend code</button>
+        </form>
+        <p class="nm-help" data-auth-status="verify" style="margin-top: 10px;" hidden></p>
       </div>
     </div>
   </div>

@@ -40,6 +40,19 @@
           <button class="nm-btn nm-btn-primary" type="submit">Create account</button>
         </form>
         <p id="register-status" class="nm-help" style="margin-top: 12px;"></p>
+        <form id="verify-form" class="nm-grid" style="gap: 16px; margin-top: 16px;" hidden>
+          <div class="nm-field">
+            <label for="verify-email">Email</label>
+            <input id="verify-email" class="nm-input" type="email" required />
+          </div>
+          <div class="nm-field">
+            <label for="verify-code">Verification code</label>
+            <input id="verify-code" class="nm-input" type="text" inputmode="numeric" autocomplete="one-time-code" required />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Verify email</button>
+          <button class="nm-btn nm-btn-ghost" type="button" id="resend-btn">Resend code</button>
+        </form>
+        <p id="verify-status" class="nm-help" style="margin-top: 12px;" hidden></p>
       </section>
     </div>
   </main>
@@ -47,6 +60,11 @@
   <script>
     const form = document.getElementById('register-form');
     const statusEl = document.getElementById('register-status');
+    const verifyForm = document.getElementById('verify-form');
+    const verifyStatus = document.getElementById('verify-status');
+    const verifyEmailInput = document.getElementById('verify-email');
+    const verifyCodeInput = document.getElementById('verify-code');
+    const resendBtn = document.getElementById('resend-btn');
     const params = new URLSearchParams(window.location.search);
     const sanitizeRedirect = (value, fallback) => {
       if (!value) return fallback;
@@ -59,6 +77,16 @@
       }
     };
     const redirectTo = sanitizeRedirect(params.get('redirect'), 'app.html');
+
+    const showVerifyStep = (email, message) => {
+      form.hidden = true;
+      statusEl.textContent = '';
+      verifyForm.hidden = false;
+      verifyStatus.hidden = false;
+      if (email) verifyEmailInput.value = email;
+      verifyStatus.textContent = message || 'We sent a verification code to your email. Enter it below to finish.';
+      verifyCodeInput.focus();
+    };
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
@@ -79,8 +107,57 @@
         statusEl.textContent = data.error || 'Registration failed.';
         return;
       }
-      localStorage.setItem('nmAuthToken', data.token);
-      window.location.href = redirectTo;
+      if (data.token) {
+        localStorage.setItem('nmAuthToken', data.token);
+        window.location.href = redirectTo;
+        return;
+      }
+      showVerifyStep(payload.email);
+    });
+
+    verifyForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      verifyStatus.textContent = 'Verifying...';
+      const email = verifyEmailInput.value.trim();
+      const code = verifyCodeInput.value.trim();
+      const response = await fetch('/api/auth/email-verification/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, code })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        verifyStatus.textContent = data.error || 'Verification failed.';
+        return;
+      }
+      if (data.token) {
+        localStorage.setItem('nmAuthToken', data.token);
+        window.location.href = redirectTo;
+        return;
+      }
+      verifyStatus.textContent = 'Email verified. You can sign in now.';
+    });
+
+    resendBtn.addEventListener('click', async () => {
+      const email = verifyEmailInput.value.trim();
+      if (!email) {
+        verifyStatus.hidden = false;
+        verifyStatus.textContent = 'Enter your email to resend a code.';
+        return;
+      }
+      verifyStatus.hidden = false;
+      verifyStatus.textContent = 'Sending verification code...';
+      const response = await fetch('/api/auth/email-verification/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        verifyStatus.textContent = data.error || 'Failed to send verification code.';
+        return;
+      }
+      verifyStatus.textContent = 'Verification code sent. Check your inbox.';
     });
   </script>
 </body>

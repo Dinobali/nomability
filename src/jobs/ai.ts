@@ -85,7 +85,49 @@ export const translateText = async (text: string, targetLanguage: string, source
   return callOllama(prompt, env.OLLAMA_MODEL);
 };
 
-export const summarizeText = async (text: string) => {
-  const prompt = `Summarize the following transcript in concise bullet points. Return only the summary.\n\n${text}`;
-  return callOllama(prompt, env.OLLAMA_MODEL);
+export const summarizeText = async (text: string, style = 'bullet') => {
+  const normalized = (style || 'bullet').toString().toLowerCase();
+  const key = normalized.replace(/[\s_]+/g, '-');
+  const isProtocol = key.includes('protocol') || key.includes('protokoll');
+  const isDetailed =
+    key.includes('detailed') ||
+    key.includes('ausfuehrlich') ||
+    key.includes('ausführlich') ||
+    key.includes('long');
+  const isCompact =
+    key.includes('compact') ||
+    key.includes('kompakt') ||
+    key.includes('knapp') ||
+    key.includes('kurz') ||
+    key.includes('short');
+  let prompt;
+
+  if (isProtocol && isDetailed) {
+    prompt =
+      'Create detailed meeting minutes (Protokoll) from the transcript. ' +
+      'Use clear headings and bullet points. Include discussion highlights, decisions, tasks/assignments, and open questions if mentioned. ' +
+      'If details are not mentioned, omit them. Write in the same language as the transcript. Return only the minutes.\n\n' +
+      text;
+  } else if (isProtocol || isCompact) {
+    prompt =
+      'Create concise meeting minutes (Protokoll) from the transcript in 5-8 bullet points. ' +
+      'Focus on main topics, decisions, and tasks. Write in the same language as the transcript. Return only the minutes.\n\n' +
+      text;
+  } else if (key === 'executive') {
+    prompt =
+      'Write an executive summary of the following transcript in 5-8 sentences. ' +
+      'Focus on the main outcomes, risks, and decisions. Write in the same language as the transcript. Return only the summary.\n\n' +
+      text;
+  } else if (key === 'action' || key === 'action-items' || key === 'actions') {
+    prompt =
+      'Extract the action items from the following transcript. Return a concise bullet list. ' +
+      'Write in the same language as the transcript. Return only the action items.\n\n' +
+      text;
+  } else {
+    prompt =
+      'Summarize the following transcript in concise bullet points. ' +
+      'Write in the same language as the transcript. Return only the summary.\n\n' +
+      text;
+  }
+  return callOllama(prompt, env.OLLAMA_SUMMARY_MODEL);
 };

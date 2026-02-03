@@ -33,6 +33,9 @@ const envSchema = z.object({
   FROM_NAME: z.string().optional(),
   MAGIC_LINK_URL: z.string().optional(),
   PASSWORD_RESET_URL: z.string().optional(),
+  EMAIL_VERIFY_URL: z.string().optional(),
+  EMAIL_VERIFICATION_REQUIRED: booleanFromEnv(false),
+  EMAIL_VERIFICATION_CODE_TTL_MINUTES: z.coerce.number().default(30),
 
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
@@ -68,6 +71,7 @@ const envSchema = z.object({
 
   OLLAMA_BASE_URL: z.string().optional(),
   OLLAMA_MODEL: z.string().default('translategemma:latest'),
+  OLLAMA_SUMMARY_MODEL: z.string().default('gemma3:latest'),
   OLLAMA_TIMEOUT_MS: z.coerce.number().default(300000)
 });
 

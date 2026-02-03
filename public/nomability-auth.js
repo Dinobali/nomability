@@ -7,8 +7,11 @@
   const panels = Array.from(document.querySelectorAll('[data-auth-panel]'));
   const loginForm = document.querySelector('[data-auth-form="login"]');
   const registerForm = document.querySelector('[data-auth-form="register"]');
+  const verifyForm = document.querySelector('[data-auth-form="verify"]');
   const loginStatus = document.querySelector('[data-auth-status="login"]');
   const registerStatus = document.querySelector('[data-auth-status="register"]');
+  const verifyStatus = document.querySelector('[data-auth-status="verify"]');
+  const resendButtons = Array.from(document.querySelectorAll('[data-auth-resend]'));
   const loggedInEls = Array.from(document.querySelectorAll('[data-auth-show="logged-in"]'));
   const loggedOutEls = Array.from(document.querySelectorAll('[data-auth-show="logged-out"]'));
   const initialsEls = Array.from(document.querySelectorAll('[data-auth-initials]'));
@@ -17,6 +20,7 @@
   const roleEls = Array.from(document.querySelectorAll('[data-auth-role]'));
   const avatarButtons = Array.from(document.querySelectorAll('[data-auth-avatar]'));
   const logoutButtons = Array.from(document.querySelectorAll('[data-auth-logout]'));
+  let pendingVerificationEmail = '';
 
   const getInitials = (value) => {
     const trimmed = (value || '').trim();
@@ -96,6 +100,13 @@
     });
     if (loginStatus) loginStatus.textContent = '';
     if (registerStatus) registerStatus.textContent = '';
+    if (verifyStatus) {
+      verifyStatus.textContent = '';
+      verifyStatus.hidden = true;
+    }
+    if (tab === 'register') {
+      resetRegisterPanel();
+    }
     const activePanel = panels.find((panel) => panel.dataset.authPanel === tab);
     const firstInput = activePanel?.querySelector('input, select, textarea, button');
     if (firstInput) firstInput.focus();
@@ -114,6 +125,75 @@
     modal.classList.remove('is-open');
     modal.hidden = true;
     document.body.classList.remove('nm-modal-open');
+  };
+
+  const setVerifyEmail = (email) => {
+    if (!verifyForm) return;
+    const emailInput = verifyForm.querySelector('[data-auth-input="verify-email"]');
+    if (emailInput && typeof email === 'string') {
+      emailInput.value = email;
+    }
+  };
+
+  const resetRegisterPanel = () => {
+    if (registerForm) registerForm.hidden = false;
+    if (verifyForm) verifyForm.hidden = true;
+    if (verifyStatus) {
+      verifyStatus.textContent = '';
+      verifyStatus.hidden = true;
+    }
+  };
+
+  const showVerificationStep = (email, message) => {
+    setActiveTab('register');
+    pendingVerificationEmail = email;
+    setVerifyEmail(email);
+    if (registerForm) registerForm.hidden = true;
+    if (verifyForm) verifyForm.hidden = false;
+    if (verifyStatus) {
+      verifyStatus.hidden = false;
+      verifyStatus.textContent = message || 'Enter the verification code from your inbox.';
+    }
+  };
+
+  const requestVerification = async (email) => {
+    if (!email) {
+      if (verifyStatus) {
+        verifyStatus.hidden = false;
+        verifyStatus.textContent = 'Enter your email to send a verification code.';
+      }
+      return false;
+    }
+    if (verifyStatus) {
+      verifyStatus.hidden = false;
+      verifyStatus.textContent = 'Sending verification code...';
+    }
+    try {
+      const response = await fetch('/api/auth/email-verification/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        if (verifyStatus) {
+          verifyStatus.hidden = false;
+          verifyStatus.textContent = data.error || 'Failed to send verification code.';
+        }
+        return false;
+      }
+      if (verifyStatus) {
+        verifyStatus.hidden = false;
+        verifyStatus.textContent = 'Verification code sent. Check your inbox.';
+      }
+      return true;
+    } catch (error) {
+      if (verifyStatus) {
+        verifyStatus.hidden = false;
+        verifyStatus.textContent = 'Failed to send verification code.';
+      }
+      return false;
+    }
   };
 
   const fetchUser = async () => {
@@ -224,6 +304,10 @@
         });
         const data = await response.json().catch(() => ({}));
         if (!response.ok) {
+          if (data?.code === 'EMAIL_NOT_VERIFIED' || data?.verificationRequired) {
+            showVerificationStep(email, 'Email not verified. Enter the code from your inbox or resend it.');
+            return;
+          }
           if (loginStatus) loginStatus.textContent = data.error || 'Login failed.';
           return;
         }
@@ -257,12 +341,67 @@
           if (registerStatus) registerStatus.textContent = data.error || 'Registration failed.';
           return;
         }
-        localStorage.setItem(TOKEN_KEY, data.token);
-        await fetchUser();
-        closeModal();
+        if (data?.token) {
+          localStorage.setItem(TOKEN_KEY, data.token);
+          await fetchUser();
+          closeModal();
+          return;
+        }
+        showVerificationStep(payload.email, 'We sent a verification code to your email. Enter it below to finish.');
       } catch (error) {
         if (registerStatus) registerStatus.textContent = 'Registration failed. Please try again.';
       }
+    });
+  }
+
+  if (verifyForm) {
+    verifyForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (verifyStatus) {
+        verifyStatus.hidden = false;
+        verifyStatus.textContent = 'Verifying...';
+      }
+      const email = verifyForm.querySelector('[data-auth-input="verify-email"]')?.value?.trim() || pendingVerificationEmail;
+      const code = verifyForm.querySelector('[data-auth-input="verify-code"]')?.value?.trim() || '';
+      try {
+        const response = await fetch('/api/auth/email-verification/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, code })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          if (verifyStatus) {
+            verifyStatus.hidden = false;
+            verifyStatus.textContent = data.error || 'Verification failed.';
+          }
+          return;
+        }
+        if (data?.token) {
+          localStorage.setItem(TOKEN_KEY, data.token);
+          await fetchUser();
+          closeModal();
+          return;
+        }
+        if (verifyStatus) {
+          verifyStatus.hidden = false;
+          verifyStatus.textContent = 'Email verified. You can log in now.';
+        }
+      } catch (error) {
+        if (verifyStatus) {
+          verifyStatus.hidden = false;
+          verifyStatus.textContent = 'Verification failed. Please try again.';
+        }
+      }
+    });
+  }
+
+  if (resendButtons.length) {
+    resendButtons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        const email = verifyForm?.querySelector('[data-auth-input="verify-email"]')?.value?.trim() || pendingVerificationEmail;
+        await requestVerification(email);
+      });
     });
   }
 

@@ -1,4 +1,5 @@
 import { FastifyInstance } from 'fastify';
+import { randomInt } from 'node:crypto';
 import { prisma } from '../lib/db.js';
 import { env } from '../config/env.js';
 import { generateToken, hashPassword, hashToken, verifyPassword, isStrongPassword, PASSWORD_POLICY_MESSAGE } from '../lib/auth.js';
@@ -6,6 +7,48 @@ import { sendMail } from '../lib/email.js';
 
 const issueJwt = (app: FastifyInstance, userId: string, orgId?: string | null) => {
   return app.jwt.sign({ sub: userId, orgId });
+};
+
+const VERIFICATION_CODE_TTL_MS = env.EMAIL_VERIFICATION_CODE_TTL_MINUTES * 60 * 1000;
+
+const ensureOrgId = async (user: { id: string; email: string; memberships?: Array<{ orgId: string }> }) => {
+  const existingOrgId = user.memberships?.[0]?.orgId || null;
+  if (existingOrgId) return existingOrgId;
+  const fallbackName = user.email.split('@')[0];
+  const org = await prisma.org.create({
+    data: {
+      name: fallbackName,
+      memberships: {
+        create: {
+          userId: user.id,
+          role: 'owner'
+        }
+      }
+    }
+  });
+  return org.id;
+};
+
+const sendEmailVerification = async (user: { id: string; email: string }) => {
+  const code = String(randomInt(100000, 1000000));
+  const tokenHash = hashToken(code);
+  const expiresAt = new Date(Date.now() + VERIFICATION_CODE_TTL_MS);
+
+  await prisma.emailVerificationToken.create({
+    data: {
+      userId: user.id,
+      tokenHash,
+      expiresAt
+    }
+  });
+
+  const linkBase = env.EMAIL_VERIFY_URL || `${env.CLIENT_URL}/verify-email.html`;
+  const link = `${linkBase}?email=${encodeURIComponent(user.email)}&code=${encodeURIComponent(code)}`;
+  await sendMail(
+    user.email,
+    'Verify your Nomability email',
+    `<p>Use this code to verify your email:</p><p><strong>${code}</strong></p><p>Or click:</p><p><a href="${link}">${link}</a></p>`
+  );
 };
 
 export const authRoutes = async (app: FastifyInstance) => {
@@ -28,7 +71,8 @@ export const authRoutes = async (app: FastifyInstance) => {
       data: {
         email: body.email,
         name: body.name,
-        passwordHash
+        passwordHash,
+        emailVerifiedAt: env.EMAIL_VERIFICATION_REQUIRED ? null : new Date()
       }
     });
 
@@ -44,6 +88,11 @@ export const authRoutes = async (app: FastifyInstance) => {
         }
       }
     });
+
+    if (env.EMAIL_VERIFICATION_REQUIRED) {
+      await sendEmailVerification(user);
+      return reply.send({ ok: true, verificationRequired: true });
+    }
 
     const token = issueJwt(app, user.id, org.id);
     return reply.send({ token });
@@ -69,22 +118,13 @@ export const authRoutes = async (app: FastifyInstance) => {
       return reply.status(401).send({ error: 'Invalid credentials.' });
     }
 
-    let orgId = user.memberships[0]?.orgId || null;
-    if (!orgId) {
-      const fallbackName = user.email.split('@')[0];
-      const org = await prisma.org.create({
-        data: {
-          name: fallbackName,
-          memberships: {
-            create: {
-              userId: user.id,
-              role: 'owner'
-            }
-          }
-        }
-      });
-      orgId = org.id;
+    if (env.EMAIL_VERIFICATION_REQUIRED && !user.emailVerifiedAt) {
+      return reply
+        .status(403)
+        .send({ error: 'Email not verified. Check your inbox for the code.', code: 'EMAIL_NOT_VERIFIED', verificationRequired: true });
     }
+
+    const orgId = await ensureOrgId(user);
     const token = issueJwt(app, user.id, orgId);
     return reply.send({ token });
   });
@@ -151,6 +191,71 @@ export const authRoutes = async (app: FastifyInstance) => {
     return reply.send({ ok: true });
   });
 
+  app.post('/api/auth/email-verification/request', async (req, reply) => {
+    const body = req.body as { email?: string; force?: boolean };
+    if (!body.email) {
+      return reply.status(400).send({ error: 'Email is required.' });
+    }
+
+    const force = body.force === true;
+    const user = await prisma.user.findUnique({ where: { email: body.email } });
+    if (!user) {
+      return reply.send({ ok: true });
+    }
+
+    if (!user.emailVerifiedAt || force) {
+      await sendEmailVerification(user);
+    }
+
+    return reply.send({ ok: true });
+  });
+
+  app.post('/api/auth/email-verification/confirm', async (req, reply) => {
+    const body = req.body as { email?: string; code?: string };
+    if (!body.email || !body.code) {
+      return reply.status(400).send({ error: 'Email and code are required.' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: body.email },
+      include: { memberships: true }
+    });
+
+    if (!user) {
+      return reply.status(400).send({ error: 'Invalid or expired code.' });
+    }
+
+    const tokenHash = hashToken(body.code.trim());
+    const record = await prisma.emailVerificationToken.findFirst({
+      where: {
+        userId: user.id,
+        tokenHash,
+        usedAt: null,
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    if (!record) {
+      return reply.status(400).send({ error: 'Invalid or expired code.' });
+    }
+
+    await prisma.emailVerificationToken.update({
+      where: { id: record.id },
+      data: { usedAt: new Date() }
+    });
+
+    if (!user.emailVerifiedAt) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() }
+      });
+    }
+
+    const orgId = await ensureOrgId(user);
+    const token = issueJwt(app, user.id, orgId);
+    return reply.send({ ok: true, token });
+  });
+
   app.post('/api/auth/password-reset/confirm', async (req, reply) => {
     const body = req.body as { token?: string; password?: string };
     if (!body.token || !body.password) {
@@ -211,22 +316,14 @@ export const authRoutes = async (app: FastifyInstance) => {
       data: { usedAt: new Date() }
     });
 
-    let orgId = record.user.memberships[0]?.orgId || null;
-    if (!orgId) {
-      const fallbackName = record.user.email.split('@')[0];
-      const org = await prisma.org.create({
-        data: {
-          name: fallbackName,
-          memberships: {
-            create: {
-              userId: record.userId,
-              role: 'owner'
-            }
-          }
-        }
+    if (!record.user.emailVerifiedAt) {
+      await prisma.user.update({
+        where: { id: record.userId },
+        data: { emailVerifiedAt: new Date() }
       });
-      orgId = org.id;
     }
+
+    const orgId = await ensureOrgId(record.user);
     const jwt = issueJwt(app, record.userId, orgId);
     return reply.send({ token: jwt });
   });
@@ -235,7 +332,7 @@ export const authRoutes = async (app: FastifyInstance) => {
     const { sub: userId, orgId } = req.user as { sub: string; orgId?: string };
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, createdAt: true }
+      select: { id: true, email: true, name: true, createdAt: true, emailVerifiedAt: true }
     });
 
     const org = orgId
@@ -261,14 +358,15 @@ export const authRoutes = async (app: FastifyInstance) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, passwordHash: true }
+      select: { id: true, email: true, name: true, passwordHash: true, emailVerifiedAt: true }
     });
 
     if (!user) {
       return reply.status(404).send({ error: 'User not found.' });
     }
 
-    const updates: { name?: string | null; email?: string } = {};
+    const updates: { name?: string | null; email?: string; emailVerifiedAt?: Date | null } = {};
+    let resendVerification = false;
 
     if (typeof body.name === 'string') {
       const trimmed = body.name.trim();
@@ -293,6 +391,10 @@ export const authRoutes = async (app: FastifyInstance) => {
           return reply.status(409).send({ error: 'Email already in use.' });
         }
         updates.email = nextEmail;
+        if (env.EMAIL_VERIFICATION_REQUIRED) {
+          updates.emailVerifiedAt = null;
+          resendVerification = true;
+        }
       }
     }
 
@@ -322,7 +424,7 @@ export const authRoutes = async (app: FastifyInstance) => {
 
     const updatedUser = await prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, name: true, createdAt: true }
+      select: { id: true, email: true, name: true, createdAt: true, emailVerifiedAt: true }
     });
     const updatedOrg = orgId
       ? await prisma.org.findUnique({
@@ -330,6 +432,10 @@ export const authRoutes = async (app: FastifyInstance) => {
           select: { id: true, name: true, createdAt: true }
         })
       : null;
+
+    if (resendVerification && updatedUser?.email) {
+      await sendEmailVerification({ id: userId, email: updatedUser.email });
+    }
 
     return reply.send({ user: updatedUser, org: updatedOrg });
   });

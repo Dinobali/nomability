@@ -4,11 +4,41 @@ import { prisma } from '../lib/db.js';
 import { jobQueue } from '../lib/queue.js';
 import { saveFile } from '../lib/storage.js';
 import { env } from '../config/env.js';
-import { canStartJob } from '../lib/usage.js';
+import { canStartJob, getSubscription } from '../lib/usage.js';
+import { getDisplayIncludedMinutes } from '../lib/plans.js';
 
 const parseBoolean = (value?: string) => value === 'true' || value === '1';
 
 export const jobRoutes = async (app: FastifyInstance) => {
+  app.get('/api/ai/entitlement', { preHandler: app.authenticate }, async (req, reply) => {
+    if (!env.AUTH_REQUIRED) {
+      return reply.send({ allowed: true });
+    }
+
+    const user = req.user as { orgId?: string };
+    if (!user?.orgId) {
+      return reply.status(401).send({ error: 'Organization not found. Please log in.' });
+    }
+
+    const entitlement = await canStartJob(user.orgId);
+    const subscription = await getSubscription(user.orgId);
+    const includedMinutes = subscription ? getDisplayIncludedMinutes(subscription.priceId) : 0;
+    const message = entitlement.allowed
+      ? undefined
+      : entitlement.subscriptionActive
+        ? 'Plan limit reached. Please top up credits or upgrade your plan.'
+        : 'No active subscription or credits. Please subscribe or top up.';
+
+    return reply.send({
+      allowed: entitlement.allowed,
+      message,
+      subscriptionActive: entitlement.subscriptionActive,
+      usageThisMonth: entitlement.usageThisMonth,
+      credits: entitlement.credits,
+      includedMinutes
+    });
+  });
+
   app.get('/api/ai/worker-health', { preHandler: app.authenticateOptional }, async (_req, reply) => {
     const healthPath = env.AI_WORKER_HEALTH_ENDPOINT || '/health';
     const url = `${env.AI_WORKER_BASE_URL}${healthPath}`;
@@ -29,6 +59,26 @@ export const jobRoutes = async (app: FastifyInstance) => {
   });
 
   app.post('/api/ai/jobs', { preHandler: app.authenticate }, async (req, reply) => {
+    const user = (req.user as { sub?: string; orgId?: string }) || {};
+    const orgId = user.orgId || null;
+    const userId = user.sub || null;
+
+    if (env.AUTH_REQUIRED) {
+      if (!orgId) {
+        return reply.status(401).send({ error: 'Organization not found. Please log in.' });
+      }
+
+      const entitlement = await canStartJob(orgId);
+      if (!entitlement.allowed) {
+        return reply.status(402).send({
+          error: 'Plan limit reached. Please top up credits or renew your plan.',
+          usageThisMonth: entitlement.usageThisMonth,
+          includedMinutes: env.PLAN_INCLUDED_MINUTES,
+          creditMinutes: entitlement.credits
+        });
+      }
+    }
+
     const parts = req.parts();
     const fields: Record<string, string> = {};
     const uploads: Array<{ filename: string; mimetype: string; key: string; bucket: string }> = [];
@@ -65,26 +115,6 @@ export const jobRoutes = async (app: FastifyInstance) => {
       outputFormat: fields.outputFormat || 'txt',
       timestamps: parseBoolean(fields.timestamps)
     };
-
-    const user = (req.user as { sub?: string; orgId?: string }) || {};
-    const orgId = user.orgId || null;
-    const userId = user.sub || null;
-
-    if (env.AUTH_REQUIRED) {
-      if (!orgId) {
-        return reply.status(401).send({ error: 'Organization not found. Please log in.' });
-      }
-
-      const entitlement = await canStartJob(orgId);
-      if (!entitlement.allowed) {
-        return reply.status(402).send({
-          error: 'Plan limit reached. Please top up credits or renew your plan.',
-          usageThisMonth: entitlement.usageThisMonth,
-          includedMinutes: env.PLAN_INCLUDED_MINUTES,
-          creditMinutes: entitlement.credits
-        });
-      }
-    }
 
     const job = await prisma.job.create({
       data: {

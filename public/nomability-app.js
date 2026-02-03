@@ -19,6 +19,11 @@
 
   const glossaryToggle = document.getElementById('task-glossary');
   const glossaryField = document.getElementById('glossary');
+  const presetButtons = Array.from(form.querySelectorAll('[data-preset]'));
+  const customPresetsContainer = form.querySelector('[data-custom-presets]');
+  const savePresetButton = form.querySelector('[data-save-preset]');
+  const proModeToggle = document.querySelector('[data-pro-mode]');
+  const advancedSections = Array.from(document.querySelectorAll('.nm-advanced'));
 
   let progressTimer;
   let progressValue = 0;
@@ -30,6 +35,160 @@
 
   const apiBase = window.location.origin;
   const ollamaBase = 'https://ai.nomability.net/ollama';
+
+  const getAllPresetButtons = () =>
+    Array.from(form.querySelectorAll('[data-preset],[data-custom-preset]'));
+
+  const setPresetActive = (activeButton) => {
+    getAllPresetButtons().forEach((button) => {
+      const isActive = button === activeButton;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+    });
+  };
+
+  const applyPayload = (payload) => {
+    if (!payload) return;
+    const setChecked = (selector, value) => {
+      const el = form.querySelector(selector);
+      if (el) el.checked = value;
+    };
+    const setValue = (selector, value) => {
+      const el = form.querySelector(selector);
+      if (el) el.value = value ?? '';
+    };
+    const tasks = payload.tasks || {};
+
+    setValue('#model', payload.model || 'base');
+    setValue('#language', payload.language || '');
+    setValue('#target-language', payload.targetLanguage || '');
+    setValue('#summary-style', payload.summaryStyle || 'bullet');
+    setValue('#speaker-count', payload.speakerCount || 'auto');
+    setValue('#output-format', payload.outputFormat || 'txt');
+    setChecked('#timestamps', !!payload.timestamps);
+    setChecked('#task-transcribe', !!tasks.transcribe);
+    setChecked('#task-translate', !!tasks.translate);
+    setChecked('#task-summarize', !!tasks.summarize);
+    setChecked('#task-diarize', !!tasks.diarize);
+    setChecked('#task-subtitle', !!tasks.subtitles);
+    setChecked('#task-sync', !!tasks.sync);
+    setChecked('#task-glossary', !!tasks.glossary);
+    setValue('#glossary', payload.glossary || '');
+
+    if (glossaryToggle && glossaryField) {
+      glossaryField.disabled = !glossaryToggle.checked;
+      glossaryField.placeholder = glossaryToggle.checked
+        ? 'Add preferred terms, one per line.'
+        : 'Enable glossary to lock terminology.';
+    }
+  };
+
+  const applyPreset = (preset) => {
+    const setChecked = (selector, value) => {
+      const el = form.querySelector(selector);
+      if (el) el.checked = value;
+    };
+    const setValue = (selector, value) => {
+      const el = form.querySelector(selector);
+      if (el) el.value = value;
+    };
+
+    setChecked('#task-transcribe', true);
+    setChecked('#task-translate', false);
+    setChecked('#task-summarize', false);
+    setChecked('#task-subtitle', false);
+    setChecked('#task-diarize', false);
+    setChecked('#task-sync', false);
+    setChecked('#task-glossary', false);
+    setValue('#summary-style', 'bullet');
+    setValue('#output-format', 'txt');
+    setChecked('#timestamps', false);
+    setValue('#target-language', '');
+
+    if (preset === 'meeting') {
+      setChecked('#task-summarize', true);
+      setValue('#summary-style', 'executive');
+    } else if (preset === 'translate') {
+      setChecked('#task-translate', true);
+      const target = form.querySelector('#target-language');
+      if (target && !target.value.trim()) target.value = 'en';
+    } else if (preset === 'subtitles') {
+      setChecked('#task-subtitle', true);
+      setValue('#output-format', 'srt');
+      setChecked('#timestamps', true);
+    }
+
+    if (glossaryToggle && glossaryField) {
+      glossaryField.disabled = !glossaryToggle.checked;
+      glossaryField.placeholder = glossaryToggle.checked
+        ? 'Add preferred terms, one per line.'
+        : 'Enable glossary to lock terminology.';
+    }
+  };
+
+  const loadCustomPresets = () => {
+    if (typeof localStorage === 'undefined') return [];
+    try {
+      const raw = localStorage.getItem('nmCustomPresets');
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (error) {
+      return [];
+    }
+  };
+
+  const saveCustomPresets = (presets) => {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem('nmCustomPresets', JSON.stringify(presets));
+  };
+
+  const renderCustomPresets = () => {
+    if (!customPresetsContainer) return;
+    const presets = loadCustomPresets();
+    customPresetsContainer.innerHTML = '';
+    if (!presets.length) {
+      const empty = document.createElement('span');
+      empty.className = 'nm-help';
+      empty.textContent = 'Save a preset to reuse custom workflows.';
+      customPresetsContainer.appendChild(empty);
+      return;
+    }
+    presets.forEach((preset) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'nm-preset';
+      button.textContent = preset.name;
+      button.dataset.customPreset = preset.name;
+      button.setAttribute('aria-pressed', 'false');
+      button.addEventListener('click', () => {
+        applyPayload(preset.payload);
+        setPresetActive(button);
+      });
+      customPresetsContainer.appendChild(button);
+    });
+  };
+
+  const savePreset = () => {
+    const name = window.prompt('Name this preset');
+    if (!name || !name.trim()) return;
+    const trimmed = name.trim();
+    const { payload } = collectFormData();
+    const presets = loadCustomPresets();
+    const existingIndex = presets.findIndex((item) => item.name === trimmed);
+    const entry = { name: trimmed, payload };
+    if (existingIndex >= 0) {
+      presets.splice(existingIndex, 1, entry);
+    } else {
+      presets.push(entry);
+    }
+    saveCustomPresets(presets);
+    renderCustomPresets();
+    const buttons = Array.from(form.querySelectorAll('[data-custom-preset]'));
+    const active = buttons.find((btn) => btn.dataset.customPreset === trimmed);
+    if (active) {
+      setPresetActive(active);
+    }
+  };
 
   const updateProgress = (value) => {
     progressValue = value;
@@ -111,6 +270,29 @@
   const getAuthHeaders = () => {
     const token = localStorage.getItem('nmAuthToken');
     return token ? { Authorization: `Bearer ${token}` } : {};
+  };
+
+  const checkEntitlement = async () => {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) {
+      return { allowed: false, message: 'Please log in to start a job.' };
+    }
+    try {
+      const response = await fetch(`${apiBase}/api/ai/entitlement`, { headers });
+      if (response.status === 401) {
+        return { allowed: false, message: 'Please log in to start a job.' };
+      }
+      if (!response.ok) {
+        return { allowed: true };
+      }
+      const data = await response.json().catch(() => ({}));
+      if (data?.allowed === false) {
+        return { allowed: false, message: data.message || 'Plan limit reached. Please top up credits or subscribe.' };
+      }
+      return { allowed: true };
+    } catch (error) {
+      return { allowed: true };
+    }
   };
 
   const resetPolling = () => {
@@ -326,6 +508,12 @@
       return;
     }
 
+    const entitlement = await checkEntitlement();
+    if (!entitlement.allowed) {
+      setStatus(entitlement.message || 'Plan limit reached. Please top up credits or subscribe.');
+      return;
+    }
+
     setStatus('Uploading');
     startProgress();
 
@@ -505,6 +693,47 @@
   if (glossaryToggle) {
     glossaryToggle.addEventListener('change', syncGlossaryState);
     syncGlossaryState();
+  }
+
+  if (presetButtons.length) {
+    presetButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        applyPreset(button.dataset.preset);
+        setPresetActive(button);
+      });
+    });
+  }
+
+  if (savePresetButton) {
+    savePresetButton.addEventListener('click', savePreset);
+  }
+
+  renderCustomPresets();
+
+  const applyProMode = (enabled) => {
+    advancedSections.forEach((section) => {
+      section.open = enabled;
+    });
+    document.body.classList.toggle('nm-pro-mode', enabled);
+  };
+
+  if (proModeToggle) {
+    const stored = localStorage.getItem('nmProMode');
+    const enabled = stored === 'true';
+    proModeToggle.checked = enabled;
+    applyProMode(enabled);
+    proModeToggle.addEventListener('change', () => {
+      const active = proModeToggle.checked;
+      localStorage.setItem('nmProMode', active ? 'true' : 'false');
+      applyProMode(active);
+    });
+    advancedSections.forEach((section) => {
+      section.addEventListener('toggle', () => {
+        if (proModeToggle.checked && !section.open) {
+          section.open = true;
+        }
+      });
+    });
   }
 
   const setActiveFiles = (files) => {

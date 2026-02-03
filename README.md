@@ -30,6 +30,8 @@ docker compose exec api npx prisma migrate dev --name init
 - `POST /api/auth/register` – create account
 - `POST /api/auth/login` – login (password)
 - `POST /api/auth/magic-link` – email a magic link
+- `POST /api/auth/email-verification/request` – send verification code
+- `POST /api/auth/email-verification/confirm` – confirm verification code
 - `POST /api/billing/checkout` – Stripe checkout (monthly or payg)
 - `POST /api/billing/portal` – Stripe customer portal
 - `GET /api/billing/invoices` – recent invoices
@@ -39,3 +41,4 @@ docker compose exec api npx prisma migrate dev --name init
 - AI worker + Ollama are configured via `AI_WORKER_BASE_URL` and `OLLAMA_BASE_URL`.
 - Storage can be local (`R2_ENABLED=false`, `LOCAL_STORAGE_PATH=/app/storage`) or Cloudflare R2.
 - Stripe checkout + webhook routes are scaffolded under `/api/billing/*`.
+- Email verification requires SMTP settings and can be toggled with `EMAIL_VERIFICATION_REQUIRED`.

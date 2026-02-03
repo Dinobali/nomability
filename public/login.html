@@ -68,6 +68,11 @@
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
+        if (data?.code === 'EMAIL_NOT_VERIFIED' || data?.verificationRequired) {
+          const verifyUrl = `verify-email.html?email=${encodeURIComponent(email)}&redirect=${encodeURIComponent(redirectTo)}`;
+          window.location.href = verifyUrl;
+          return;
+        }
         statusEl.textContent = data.error || 'Login failed.';
         return;
       }

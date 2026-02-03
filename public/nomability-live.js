@@ -12,6 +12,29 @@
     return token ? { Authorization: `Bearer ${token}` } : {};
   };
 
+  const checkEntitlement = async (jobBase) => {
+    const headers = getAuthHeaders();
+    if (!headers.Authorization) {
+      return { allowed: false, message: 'Login required to start a job.' };
+    }
+    try {
+      const response = await fetch(`${jobBase}/api/ai/entitlement`, { headers });
+      if (response.status === 401) {
+        return { allowed: false, message: 'Login required to start a job.' };
+      }
+      if (!response.ok) {
+        return { allowed: true };
+      }
+      const data = await response.json().catch(() => ({}));
+      if (data?.allowed === false) {
+        return { allowed: false, message: data.message || 'Plan limit reached. Please top up credits or subscribe.' };
+      }
+      return { allowed: true };
+    } catch (error) {
+      return { allowed: true };
+    }
+  };
+
   const escapeHtml = (text) =>
     String(text)
       .replace(/&/g, '&amp;')
@@ -165,6 +188,11 @@
     summaryStyle,
     tasks
   }) => {
+    const entitlement = await checkEntitlement(jobBase);
+    if (!entitlement.allowed) {
+      throw new Error(entitlement.message || 'Plan limit reached.');
+    }
+
     const formData = new FormData();
     formData.append('files', blob, 'recording.webm');
 
@@ -262,6 +290,9 @@
     const recDownloadButtons = Array.from(
       recordingPanel.querySelectorAll('[data-rec-download]')
     );
+    const recPresetButtons = Array.from(
+      recordingPanel.querySelectorAll('[data-rec-preset]')
+    );
 
     const recTabs = Array.from(recordingPanel.querySelectorAll('[data-rec-tab]'));
     const recPanels = Array.from(recordingPanel.querySelectorAll('[data-rec-panel]'));
@@ -301,6 +332,31 @@
       progressValue = value;
       if (recProgressBar) recProgressBar.style.width = `${value}%`;
       if (recProgressLabel) recProgressLabel.textContent = `${value}%`;
+    };
+
+    const setRecPresetActive = (activeButton) => {
+      recPresetButtons.forEach((button) => {
+        const isActive = button === activeButton;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    };
+
+    const applyRecPreset = (preset) => {
+      if (recTaskTranslate) recTaskTranslate.checked = false;
+      if (recTaskSummarize) recTaskSummarize.checked = false;
+      if (recSummaryStyle) recSummaryStyle.value = 'bullet';
+      if (recTargetLanguage) recTargetLanguage.value = '';
+
+      if (preset === 'summary') {
+        if (recTaskSummarize) recTaskSummarize.checked = true;
+        if (recSummaryStyle) recSummaryStyle.value = 'executive';
+      } else if (preset === 'translate') {
+        if (recTaskTranslate) recTaskTranslate.checked = true;
+        if (recTargetLanguage && !recTargetLanguage.value.trim()) {
+          recTargetLanguage.value = 'en';
+        }
+      }
     };
 
     const startProgress = () => {
@@ -447,6 +503,13 @@
     });
 
     activateTab('transcript');
+
+    recPresetButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        applyRecPreset(button.dataset.recPreset);
+        setRecPresetActive(button);
+      });
+    });
 
     const cleanupAudio = () => {
       if (audioUrl) {
@@ -693,16 +756,30 @@
     const liveStart = livePanel.querySelector('[data-live-start]');
     const liveStop = livePanel.querySelector('[data-live-stop]');
     const liveClear = livePanel.querySelector('[data-live-clear]');
+    const liveProcess = livePanel.querySelector('[data-live-process]');
     const liveStatus = livePanel.querySelector('[data-live-status]');
-    const liveOutput = livePanel.querySelector('[data-live-output]');
     const liveLanguage = livePanel.querySelector('[data-live-language]');
     const liveModel = livePanel.querySelector('[data-live-model]');
     const liveVad = livePanel.querySelector('[data-live-vad]');
+    const liveTargetLanguage = livePanel.querySelector('[data-live-target-language]');
+    const liveSummaryStyle = livePanel.querySelector('[data-live-summary-style]');
+    const liveTaskTranslate = livePanel.querySelector('[data-live-task="translate"]');
+    const liveTaskSummarize = livePanel.querySelector('[data-live-task="summarize"]');
     const liveDownloadButtons = Array.from(
       livePanel.querySelectorAll('[data-live-download]')
     );
+    const livePresetButtons = Array.from(
+      livePanel.querySelectorAll('[data-live-preset]')
+    );
+    const liveTabs = Array.from(livePanel.querySelectorAll('[data-live-tab]'));
+    const livePanels = Array.from(livePanel.querySelectorAll('[data-live-panel]'));
+    const outputs = {
+      transcript: livePanel.querySelector('[data-live-panel="transcript"]'),
+      summary: livePanel.querySelector('[data-live-panel="summary"]'),
+      translation: livePanel.querySelector('[data-live-panel="translation"]')
+    };
 
-    if (!liveStart || !liveStop || !liveOutput) return;
+    if (!liveStart || !liveStop || !outputs.transcript) return;
 
     let liveActive = false;
     let liveStream = null;
@@ -714,32 +791,116 @@
     let liveUid = null;
     let liveFinal = '';
     let livePartial = '';
+    let lastLiveFinalText = '';
+    let liveSeenSegmentKeys = new Set();
+    let liveRecorder = null;
+    let liveChunks = [];
+    let liveAudioBlob = null;
+    let liveProcessing = false;
+    let liveRawResult = null;
+
+    const defaultLiveTranscript =
+      outputs.transcript.textContent || 'Start live transcription to see real-time transcription.';
+    const defaultLiveSummary =
+      outputs.summary?.textContent || 'Summaries appear after processing.';
+    const defaultLiveTranslation =
+      outputs.translation?.textContent || 'Translations appear after processing.';
 
     const setLiveStatus = (text) => {
       if (liveStatus) liveStatus.textContent = text;
     };
 
     const updateLiveButtons = () => {
-      liveStart.disabled = liveActive;
+      liveStart.disabled = liveActive || liveProcessing;
       liveStop.disabled = !liveActive;
       liveClear.disabled = !liveActive && !liveFinal;
+      if (liveProcess) {
+        liveProcess.disabled = liveActive || liveProcessing || !liveAudioBlob;
+      }
     };
 
     const updateLiveOutput = () => {
       const partial = livePartial
         ? `<span class="nm-live-partial">${livePartial}</span>\n`
         : '';
-      liveOutput.innerHTML = `${liveFinal}${partial}` || 'Start WhisperLive to see real-time transcription.';
-      liveOutput.scrollTop = liveOutput.scrollHeight;
+      outputs.transcript.innerHTML = `${liveFinal}${partial}` || defaultLiveTranscript;
+      outputs.transcript.scrollTop = outputs.transcript.scrollHeight;
+    };
+
+    const setLivePresetActive = (activeButton) => {
+      livePresetButtons.forEach((button) => {
+        const isActive = button === activeButton;
+        button.classList.toggle('is-active', isActive);
+        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    };
+
+    const applyLivePreset = (preset) => {
+      if (liveTaskTranslate) liveTaskTranslate.checked = false;
+      if (liveTaskSummarize) liveTaskSummarize.checked = false;
+      if (liveSummaryStyle) liveSummaryStyle.value = 'bullet';
+      if (liveTargetLanguage) liveTargetLanguage.value = '';
+
+      if (preset === 'summary') {
+        if (liveTaskSummarize) liveTaskSummarize.checked = true;
+        if (liveSummaryStyle) liveSummaryStyle.value = 'executive';
+      } else if (preset === 'translate') {
+        if (liveTaskTranslate) liveTaskTranslate.checked = true;
+        if (liveTargetLanguage && !liveTargetLanguage.value.trim()) {
+          liveTargetLanguage.value = 'en';
+        }
+      }
+    };
+
+    const normalizeLiveText = (value) => String(value || '').replace(/\s+/g, ' ').trim();
+
+    const getSegmentTimeKey = (segment) => {
+      const start = segment?.start ?? segment?.start_ts ?? segment?.start_time ?? null;
+      const end = segment?.end ?? segment?.end_ts ?? segment?.end_time ?? null;
+      if (start === null && end === null) return '';
+      const startKey = start === null || start === undefined ? '' : String(start);
+      const endKey = end === null || end === undefined ? '' : String(end);
+      return `${startKey}-${endKey}`;
     };
 
     const appendLiveFinal = (text) => {
-      const safeText = escapeHtml(text.trim());
-      if (!safeText) return;
-      const timestamp = new Date().toLocaleTimeString();
-      liveFinal += `<span class="nm-live-timestamp">[${timestamp}]</span> ${safeText}\n\n`;
+      const rawText = text.trim();
+      if (!rawText) return;
+      const normalized = normalizeLiveText(rawText);
+      if (!normalized) return;
+      if (normalized === lastLiveFinalText) {
+        return;
+      }
+      lastLiveFinalText = normalized;
+      const safeText = escapeHtml(rawText);
+      liveFinal += `${safeText}\n\n`;
       livePartial = '';
       updateLiveOutput();
+    };
+
+    const setLiveOutputsDefault = () => {
+      outputs.transcript.textContent = defaultLiveTranscript;
+      if (outputs.summary) outputs.summary.textContent = defaultLiveSummary;
+      if (outputs.translation) outputs.translation.textContent = defaultLiveTranslation;
+    };
+
+    const getLiveOutputs = () => ({
+      transcript: normalizeOutput(outputs.transcript?.textContent, defaultLiveTranscript),
+      summary: normalizeOutput(outputs.summary?.textContent, defaultLiveSummary),
+      translation: normalizeOutput(outputs.translation?.textContent, defaultLiveTranslation)
+    });
+
+    const updateLiveResult = (updates) => {
+      liveRawResult = { ...(liveRawResult || {}), ...(updates || {}) };
+    };
+
+    const activateLiveTab = (name) => {
+      liveTabs.forEach((tab) => {
+        tab.classList.toggle('active', tab.dataset.liveTab === name);
+      });
+      livePanels.forEach((panel) => {
+        panel.hidden = panel.dataset.livePanel !== name;
+      });
     };
 
     const getLiveTranscriptText = () => {
@@ -750,10 +911,26 @@
     };
 
     const getLiveDownloadPayload = (type) => {
-      const transcriptText = getLiveTranscriptText();
+      const { transcript, summary, translation } = getLiveOutputs();
+      const transcriptText = transcript || getLiveTranscriptText();
+      const translationText =
+        translation ||
+        liveRawResult?.translation?.text ||
+        liveRawResult?.translation ||
+        liveRawResult?.translated_text ||
+        liveRawResult?.translatedText ||
+        '';
+      const summaryText =
+        summary ||
+        liveRawResult?.summary ||
+        liveRawResult?.summaryText ||
+        liveRawResult?.summarized_text ||
+        '';
       if (type === 'json') {
         const payload = {
           transcript: transcriptText,
+          summary: summaryText,
+          translation: translationText,
           model: liveModel?.value || 'base',
           language: (liveLanguage?.value || '').trim() || null
         };
@@ -765,14 +942,14 @@
       }
       if (type === 'translation') {
         return {
-          content: '',
+          content: translationText,
           filename: 'nomability-translation.txt',
           mime: 'text/plain'
         };
       }
       if (type === 'summary') {
         return {
-          content: '',
+          content: summaryText,
           filename: 'nomability-summary.txt',
           mime: 'text/plain'
         };
@@ -824,10 +1001,83 @@
       return result;
     };
 
+    const processLive = async () => {
+      if (!liveAudioBlob || liveProcessing) return;
+      const tasks = {
+        translate: !!liveTaskTranslate?.checked,
+        summarize: !!liveTaskSummarize?.checked
+      };
+
+      if (tasks.translate && !liveTargetLanguage?.value.trim()) {
+        if (outputs.translation) {
+          outputs.translation.textContent = 'Set a target language to translate.';
+        }
+        tasks.translate = false;
+      }
+
+      if (!tasks.translate && !tasks.summarize) {
+        setLiveStatus('Select translate or summarize');
+        return;
+      }
+
+      liveProcessing = true;
+      updateLiveButtons();
+      setLiveStatus('Processing extras');
+      if (tasks.summarize && outputs.summary) {
+        outputs.summary.textContent = defaultLiveSummary;
+      }
+      if (tasks.translate && outputs.translation) {
+        outputs.translation.textContent = defaultLiveTranslation;
+      }
+
+      try {
+        const result = await submitExtrasJob({
+          jobBase: JOBS_BASE_URL,
+          blob: liveAudioBlob,
+          model: liveModel?.value || 'base',
+          language: liveLanguage?.value || '',
+          targetLanguage: liveTargetLanguage?.value || '',
+          summaryStyle: liveSummaryStyle?.value || 'bullet',
+          tasks
+        });
+        renderExtras(
+          { summary: outputs.summary, translation: outputs.translation },
+          result,
+          tasks
+        );
+        updateLiveResult(result);
+        if (tasks.summarize && outputs.summary) {
+          activateLiveTab('summary');
+        } else if (tasks.translate && outputs.translation) {
+          activateLiveTab('translation');
+        }
+        setLiveStatus('Completed');
+      } catch (error) {
+        const message = error?.message || 'Extras failed.';
+        if (tasks.summarize && outputs.summary) {
+          outputs.summary.textContent = message;
+        }
+        if (tasks.translate && outputs.translation) {
+          outputs.translation.textContent = message;
+        }
+        setLiveStatus('Extras failed');
+      } finally {
+        liveProcessing = false;
+        updateLiveButtons();
+      }
+    };
+
     const stopLive = () => {
       liveActive = false;
       setLiveStatus('Idle');
 
+      if (liveRecorder) {
+        const recorder = liveRecorder;
+        liveRecorder = null;
+        if (recorder.state !== 'inactive') {
+          recorder.stop();
+        }
+      }
       if (liveProcessor) {
         liveProcessor.onaudioprocess = null;
         liveProcessor.disconnect();
@@ -890,9 +1140,46 @@
         liveActive = true;
         liveFinal = '';
         livePartial = '';
+        lastLiveFinalText = '';
+        liveSeenSegmentKeys = new Set();
+        liveChunks = [];
+        liveAudioBlob = null;
+        liveRawResult = null;
+        setLiveOutputsDefault();
         updateLiveOutput();
         updateLiveButtons();
         setLiveStatus('Connecting');
+
+        if (window.MediaRecorder) {
+          try {
+            liveRecorder = new MediaRecorder(liveStream, {
+              mimeType: 'audio/webm;codecs=opus'
+            });
+          } catch (error) {
+            liveRecorder = new MediaRecorder(liveStream);
+          }
+
+          liveRecorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) {
+              liveChunks.push(event.data);
+            }
+          };
+
+          liveRecorder.onstop = (event) => {
+            const mimeType = event?.target?.mimeType || 'audio/webm';
+            if (liveChunks.length) {
+              liveAudioBlob = new Blob(liveChunks, { type: mimeType });
+            } else {
+              liveAudioBlob = null;
+            }
+            if (liveAudioBlob) {
+              setLiveStatus('Ready to process');
+            }
+            updateLiveButtons();
+          };
+
+          liveRecorder.start();
+        }
 
         const AudioContextClass = window.AudioContext || window.webkitAudioContext;
         liveAudioContext = new AudioContextClass();
@@ -940,6 +1227,16 @@
             message.segments.forEach((segment) => {
               if (!segment || !segment.text) return;
               if (segment.completed) {
+                const timeKey = getSegmentTimeKey(segment);
+                if (timeKey) {
+                  const normalized = normalizeLiveText(segment.text);
+                  const segmentKey = `${timeKey}:${normalized}`;
+                  if (liveSeenSegmentKeys.has(segmentKey)) return;
+                  liveSeenSegmentKeys.add(segmentKey);
+                  if (liveSeenSegmentKeys.size > 2000) {
+                    liveSeenSegmentKeys = new Set(Array.from(liveSeenSegmentKeys).slice(-1000));
+                  }
+                }
                 appendLiveFinal(segment.text);
               } else {
                 livePartial = escapeHtml(segment.text.trim());
@@ -979,6 +1276,16 @@
     const clearLive = () => {
       liveFinal = '';
       livePartial = '';
+      lastLiveFinalText = '';
+      liveSeenSegmentKeys = new Set();
+      liveChunks = [];
+      liveAudioBlob = null;
+      liveRawResult = null;
+      liveProcessing = false;
+      setLiveOutputsDefault();
+      if (liveTabs.length) {
+        activateLiveTab('transcript');
+      }
       updateLiveOutput();
       updateLiveButtons();
     };
@@ -986,9 +1293,24 @@
     liveStart.addEventListener('click', startLive);
     liveStop.addEventListener('click', stopLive);
     liveClear.addEventListener('click', clearLive);
+    if (liveProcess) {
+      liveProcess.addEventListener('click', processLive);
+    }
+    livePresetButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        applyLivePreset(button.dataset.livePreset);
+        setLivePresetActive(button);
+      });
+    });
+    liveTabs.forEach((tab) => {
+      tab.addEventListener('click', () => activateLiveTab(tab.dataset.liveTab));
+    });
 
     updateLiveButtons();
     updateLiveOutput();
+    if (liveTabs.length) {
+      activateLiveTab('transcript');
+    }
   };
 
   setupRecording();

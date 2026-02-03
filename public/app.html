@@ -26,6 +26,7 @@
   <script defer src="nomability-auth.js"></script>
   <script defer src="nomability-app.js"></script>
   <script defer src="nomability-live.js"></script>
+  <script defer src="nomability-tts.js"></script>
 </head>
 <body class="nm-page-app">
   <header class="nm-header">
@@ -72,6 +73,10 @@
       <a href="/index.html#product">Product</a>
       <a href="pricing.html">Pricing</a>
       <a href="profile.html">Account</a>
+      <div class="nm-nav-mobile-cta">
+        <a class="nm-btn nm-btn-primary" href="mailto:support@nomability.net">Talk to sales</a>
+        <a class="nm-btn nm-btn-ghost" href="admin.html" data-auth-role="admin" hidden>Admin</a>
+      </div>
       <div class="nm-nav-mobile-auth">
         <a class="nm-btn nm-btn-ghost" href="login.html" data-auth-open="login" data-auth-show="logged-out">Login</a>
         <a class="nm-btn nm-btn-primary" href="register.html" data-auth-open="register" data-auth-show="logged-out">Register</a>
@@ -84,20 +89,26 @@
 
   <main class="nm-app-shell">
     <div class="nm-wrap">
-      <div class="nm-studio-layout" style="margin-top: 26px;">
+      <div class="nm-studio-layout">
         <aside class="nm-panel nm-studio-sidebar">
           <h2>Studio navigation</h2>
           <p class="nm-help">Jump between features without scrolling the full page.</p>
           <div class="nm-studio-nav">
             <div class="nm-studio-nav-group">
               <span class="nm-studio-label">Features</span>
-              <button class="nm-studio-link is-active" type="button" data-studio-nav="jobs" aria-selected="true" aria-controls="studio-jobs">Batch jobs</button>
+              <button class="nm-studio-link is-active" type="button" data-studio-nav="jobs" aria-selected="true" aria-controls="studio-jobs">Transcription</button>
               <button class="nm-studio-link" type="button" data-studio-nav="recording" aria-selected="false" aria-controls="studio-recording">Recording</button>
-              <button class="nm-studio-link" type="button" data-studio-nav="live" aria-selected="false" aria-controls="studio-live">WhisperLive</button>
+              <button class="nm-studio-link" type="button" data-studio-nav="live" aria-selected="false" aria-controls="studio-live">Live transcription</button>
+              <button class="nm-studio-link" type="button" data-studio-nav="tts" aria-selected="false" aria-controls="studio-tts">Text to speech</button>
             </div>
             <div class="nm-studio-nav-group">
               <span class="nm-studio-label">Users</span>
               <button class="nm-studio-link" type="button" data-studio-nav="users" aria-selected="false" aria-controls="studio-users">Users & access</button>
+            </div>
+            <div class="nm-studio-nav-group">
+              <span class="nm-studio-label">Mode</span>
+              <label class="nm-toggle nm-pro-toggle">Pro mode<input type="checkbox" data-pro-mode></label>
+              <p class="nm-help">Show advanced settings by default.</p>
             </div>
           </div>
         </aside>
@@ -107,6 +118,12 @@
             <div class="nm-app-grid">
               <section class="nm-panel nm-reveal" data-reveal>
                 <h2>Create a job</h2>
+                <p class="nm-help">Beginner friendly by default. Use a preset or open advanced settings for full control.</p>
+                <div class="nm-step-list">
+                  <div class="nm-step"><span>1</span> Add files</div>
+                  <div class="nm-step"><span>2</span> Pick outputs</div>
+                  <div class="nm-step"><span>3</span> Run job</div>
+                </div>
                 <form id="nm-job-form">
                   <div class="nm-dropzone" data-dropzone>
                     <input id="nm-files" name="files" type="file" accept=".mp3,.mp4,.mpeg,.mpga,.m4a,.wav,.webm,.opus,.flac,.ogg" multiple style="display:none;">
@@ -119,82 +136,112 @@
 
                   <div class="nm-divider"></div>
 
-                  <div class="nm-toggle-grid">
-                    <label class="nm-toggle">Transcribe<input id="task-transcribe" type="checkbox" checked></label>
-                    <label class="nm-toggle">Translate<input id="task-translate" type="checkbox"></label>
-                    <label class="nm-toggle">Summarize<input id="task-summarize" type="checkbox"></label>
-                    <label class="nm-toggle">Diarize<input id="task-diarize" type="checkbox"></label>
-                    <label class="nm-toggle">Subtitles<input id="task-subtitle" type="checkbox" checked></label>
-                    <label class="nm-toggle">Sync captions<input id="task-sync" type="checkbox"></label>
-                    <label class="nm-toggle">Glossary<input id="task-glossary" type="checkbox"></label>
+                  <div class="nm-presets" data-job-presets>
+                    <button class="nm-preset is-active" type="button" data-preset="quick" aria-pressed="true">Quick transcript</button>
+                    <button class="nm-preset" type="button" data-preset="meeting" aria-pressed="false">Meeting notes</button>
+                    <button class="nm-preset" type="button" data-preset="translate" aria-pressed="false">Translate</button>
+                    <button class="nm-preset" type="button" data-preset="subtitles" aria-pressed="false">Subtitles</button>
                   </div>
+                  <p class="nm-help">Presets update the outputs and export format automatically.</p>
+                  <div class="nm-presets nm-presets-custom" data-custom-presets></div>
+
+                  <div class="nm-divider"></div>
+
+                  <div class="nm-toggle-grid">
+                    <label class="nm-toggle"><span>Transcribe <span class="nm-tip" data-tip="Generates the transcript text from audio.">?</span></span><input id="task-transcribe" type="checkbox" checked></label>
+                    <label class="nm-toggle"><span>Translate <span class="nm-tip" data-tip="Adds a translated version of the transcript.">?</span></span><input id="task-translate" type="checkbox"></label>
+                    <label class="nm-toggle"><span>Summarize <span class="nm-tip" data-tip="Creates a short summary from the transcript.">?</span></span><input id="task-summarize" type="checkbox"></label>
+                    <label class="nm-toggle"><span>Subtitles <span class="nm-tip" data-tip="Creates subtitle files like SRT/VTT.">?</span></span><input id="task-subtitle" type="checkbox"></label>
+                  </div>
+                  <p class="nm-help">Enable translation or summaries when you need them.</p>
 
                   <div class="nm-divider"></div>
 
                   <div class="nm-grid nm-grid-2">
                     <div class="nm-field">
-                      <label for="model">Model</label>
-                      <select id="model" class="nm-select">
-                        <option value="tiny">tiny</option>
-                        <option value="base" selected>base</option>
-                        <option value="small">small</option>
-                        <option value="medium">medium</option>
-                        <option value="large">large</option>
-                      </select>
-                    </div>
-                    <div class="nm-field">
-                      <label for="language">Source language</label>
-                      <input id="language" class="nm-input" placeholder="auto" />
-                    </div>
-                    <div class="nm-field">
-                      <label for="target-language">Target language</label>
+                      <label for="target-language">Target language <span class="nm-tip" data-tip="Used only when Translate is enabled. Example: en, de, fr.">?</span></label>
                       <input id="target-language" class="nm-input" placeholder="en, de, fr" />
                     </div>
                     <div class="nm-field">
-                      <label for="summary-style">Summary style</label>
+                      <label for="summary-style">Summary style <span class="nm-tip" data-tip="Choose how concise the summary should be.">?</span></label>
                       <select id="summary-style" class="nm-select">
                         <option value="bullet">Bullet highlights</option>
                         <option value="executive">Executive summary</option>
                         <option value="action">Action items</option>
-                      </select>
-                    </div>
-                    <div class="nm-field">
-                      <label for="speaker-count">Speaker count</label>
-                      <select id="speaker-count" class="nm-select">
-                        <option value="auto">Auto-detect</option>
-                        <option value="1">1 speaker</option>
-                        <option value="2">2 speakers</option>
-                        <option value="3">3+ speakers</option>
-                      </select>
-                    </div>
-                    <div class="nm-field">
-                      <label for="output-format">Primary export</label>
-                      <select id="output-format" class="nm-select">
-                        <option value="txt">TXT</option>
-                        <option value="srt">SRT</option>
-                        <option value="vtt">VTT</option>
-                        <option value="json">JSON</option>
+                        <option value="protocol_detailed">Protokoll – ausführlich</option>
+                        <option value="protocol_compact">Protokoll – kompakt</option>
                       </select>
                     </div>
                   </div>
+                  <p class="nm-help">Target language is used only when Translate is enabled.</p>
 
                   <div class="nm-divider"></div>
 
-                  <div class="nm-field">
-                    <label for="glossary">Glossary</label>
-                    <textarea id="glossary" class="nm-textarea" placeholder="Enable glossary to lock terminology." disabled></textarea>
-                  </div>
+                  <details class="nm-advanced">
+                    <summary>Advanced settings</summary>
+                    <div class="nm-advanced-body">
+                      <div class="nm-toggle-grid">
+                        <label class="nm-toggle"><span>Diarize <span class="nm-tip" data-tip="Labels speakers in the transcript.">?</span></span><input id="task-diarize" type="checkbox"></label>
+                        <label class="nm-toggle"><span>Sync captions <span class="nm-tip" data-tip="Aligns captions to the audio timeline.">?</span></span><input id="task-sync" type="checkbox"></label>
+                        <label class="nm-toggle"><span>Glossary <span class="nm-tip" data-tip="Locks preferred terms and spellings.">?</span></span><input id="task-glossary" type="checkbox"></label>
+                      </div>
 
-                  <div class="nm-field" style="margin-top: 12px;">
-                    <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
-                      <input id="timestamps" type="checkbox" checked>
-                      Include timestamps
-                    </label>
-                  </div>
+                      <div class="nm-divider"></div>
+
+                      <div class="nm-grid nm-grid-2">
+                        <div class="nm-field">
+                          <label for="model">Model <span class="nm-tip" data-tip="Bigger models are more accurate but slower.">?</span></label>
+                          <select id="model" class="nm-select">
+                            <option value="tiny">tiny</option>
+                            <option value="base" selected>base</option>
+                            <option value="small">small</option>
+                            <option value="medium">medium</option>
+                            <option value="large">large</option>
+                          </select>
+                        </div>
+                        <div class="nm-field">
+                          <label for="language">Source language <span class="nm-tip" data-tip="Leave empty to auto-detect.">?</span></label>
+                          <input id="language" class="nm-input" placeholder="auto" />
+                        </div>
+                        <div class="nm-field">
+                          <label for="speaker-count">Speaker count <span class="nm-tip" data-tip="Hint diarization when you know the number of speakers.">?</span></label>
+                          <select id="speaker-count" class="nm-select">
+                            <option value="auto">Auto-detect</option>
+                            <option value="1">1 speaker</option>
+                            <option value="2">2 speakers</option>
+                            <option value="3">3+ speakers</option>
+                          </select>
+                        </div>
+                        <div class="nm-field">
+                          <label for="output-format">Primary export <span class="nm-tip" data-tip="Choose the main download format for this job.">?</span></label>
+                          <select id="output-format" class="nm-select">
+                            <option value="txt">TXT</option>
+                            <option value="srt">SRT</option>
+                            <option value="vtt">VTT</option>
+                            <option value="json">JSON</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div class="nm-field" style="margin-top: 12px;">
+                        <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
+                          <input id="timestamps" type="checkbox">
+                          Include timestamps
+                        </label>
+                      </div>
+
+                      <div class="nm-divider"></div>
+
+                      <div class="nm-field">
+                        <label for="glossary">Glossary</label>
+                        <textarea id="glossary" class="nm-textarea" placeholder="Enable glossary to lock terminology." disabled></textarea>
+                      </div>
+                    </div>
+                  </details>
 
                   <div style="margin-top: 18px; display: flex; gap: 12px; flex-wrap: wrap;">
                     <button class="nm-btn nm-btn-primary" type="submit">Run job</button>
-                    <button class="nm-btn nm-btn-ghost" type="button">Save preset</button>
+                    <button class="nm-btn nm-btn-ghost" type="button" data-save-preset>Save preset</button>
                   </div>
                 </form>
               </section>
@@ -245,6 +292,11 @@
                   <span class="nm-chip" data-rec-status>Idle</span>
                 </div>
                 <p class="nm-help">Capture audio from your microphone and stream the transcript as it is generated.</p>
+                <div class="nm-step-list">
+                  <div class="nm-step"><span>1</span> Record</div>
+                  <div class="nm-step"><span>2</span> Pick extras</div>
+                  <div class="nm-step"><span>3</span> Process</div>
+                </div>
                 <div class="nm-status" style="margin-top: 10px;">
                   <span>Progress</span>
                   <span data-rec-progress-label>0%</span>
@@ -260,39 +312,54 @@
                 </div>
                 <audio class="nm-live-audio" data-rec-audio controls hidden></audio>
                 <div class="nm-divider"></div>
+                <div class="nm-presets" data-rec-presets>
+                  <button class="nm-preset is-active" type="button" data-rec-preset="transcript" aria-pressed="true">Transcript only</button>
+                  <button class="nm-preset" type="button" data-rec-preset="summary" aria-pressed="false">Summary</button>
+                  <button class="nm-preset" type="button" data-rec-preset="translate" aria-pressed="false">Translate</button>
+                </div>
+                <p class="nm-help">Presets toggle the extras below.</p>
                 <div class="nm-toggle-grid">
-                  <label class="nm-toggle">Transcribe<input type="checkbox" checked disabled data-rec-task="transcribe"></label>
-                  <label class="nm-toggle">Translate<input type="checkbox" data-rec-task="translate"></label>
-                  <label class="nm-toggle">Summarize<input type="checkbox" data-rec-task="summarize"></label>
+                  <label class="nm-toggle"><span>Transcribe <span class="nm-tip" data-tip="Generates the transcript text from audio.">?</span></span><input type="checkbox" checked disabled data-rec-task="transcribe"></label>
+                  <label class="nm-toggle"><span>Translate <span class="nm-tip" data-tip="Adds a translated version of the transcript.">?</span></span><input type="checkbox" data-rec-task="translate"></label>
+                  <label class="nm-toggle"><span>Summarize <span class="nm-tip" data-tip="Creates a short summary from the transcript.">?</span></span><input type="checkbox" data-rec-task="summarize"></label>
                 </div>
                 <div class="nm-grid nm-grid-2" style="margin-top: 16px;">
                   <div class="nm-field">
-                    <label for="rec-model">Model</label>
-                    <select id="rec-model" class="nm-select" data-rec-model>
-                      <option value="tiny">tiny</option>
-                      <option value="base" selected>base</option>
-                      <option value="small">small</option>
-                      <option value="medium">medium</option>
-                      <option value="large">large</option>
-                    </select>
-                  </div>
-                  <div class="nm-field">
-                    <label for="rec-language">Language (optional)</label>
-                    <input id="rec-language" class="nm-input" placeholder="auto" data-rec-language />
-                  </div>
-                  <div class="nm-field">
-                    <label for="rec-target-language">Target language</label>
+                    <label for="rec-target-language">Target language <span class="nm-tip" data-tip="Used only when Translate is enabled. Example: en, de, fr.">?</span></label>
                     <input id="rec-target-language" class="nm-input" placeholder="en, de, fr" data-rec-target-language />
                   </div>
                   <div class="nm-field">
-                    <label for="rec-summary-style">Summary style</label>
+                    <label for="rec-summary-style">Summary style <span class="nm-tip" data-tip="Choose how concise the summary should be.">?</span></label>
                     <select id="rec-summary-style" class="nm-select" data-rec-summary-style>
                       <option value="bullet">Bullet highlights</option>
                       <option value="executive">Executive summary</option>
                       <option value="action">Action items</option>
+                      <option value="protocol_detailed">Protokoll – ausführlich</option>
+                      <option value="protocol_compact">Protokoll – kompakt</option>
                     </select>
                   </div>
                 </div>
+                <details class="nm-advanced" style="margin-top: 16px;">
+                  <summary>Advanced settings</summary>
+                  <div class="nm-advanced-body">
+                    <div class="nm-grid nm-grid-2">
+                      <div class="nm-field">
+                        <label for="rec-model">Model <span class="nm-tip" data-tip="Bigger models are more accurate but slower.">?</span></label>
+                        <select id="rec-model" class="nm-select" data-rec-model>
+                          <option value="tiny">tiny</option>
+                          <option value="base" selected>base</option>
+                          <option value="small">small</option>
+                          <option value="medium">medium</option>
+                          <option value="large">large</option>
+                        </select>
+                      </div>
+                      <div class="nm-field">
+                        <label for="rec-language">Language (optional) <span class="nm-tip" data-tip="Leave empty to auto-detect.">?</span></label>
+                        <input id="rec-language" class="nm-input" placeholder="auto" data-rec-language />
+                      </div>
+                    </div>
+                  </div>
+                </details>
                 <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
                   <button class="nm-btn nm-btn-primary" type="button" data-rec-process disabled>Process recording</button>
                   <button class="nm-btn nm-btn-ghost" type="button" data-rec-clear disabled>Clear</button>
@@ -325,37 +392,84 @@
                   <h3>Real-time transcription</h3>
                   <span class="nm-chip" data-live-status>Idle</span>
                 </div>
-                <p class="nm-help">Stream microphone audio to WhisperLive over WebSocket and watch the transcript update live.</p>
-                <div class="nm-divider"></div>
-                <div class="nm-grid nm-grid-2">
-                  <div class="nm-field">
-                    <label for="live-language">Language (optional)</label>
-                    <input id="live-language" class="nm-input" placeholder="auto" data-live-language />
-                  </div>
-                  <div class="nm-field">
-                    <label for="live-model">Model</label>
-                    <select id="live-model" class="nm-select" data-live-model>
-                      <option value="tiny">tiny</option>
-                      <option value="base" selected>base</option>
-                      <option value="small">small</option>
-                      <option value="medium">medium</option>
-                      <option value="large">large</option>
-                    </select>
-                  </div>
-                  <div class="nm-field">
-                    <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
-                      <input type="checkbox" data-live-vad />
-                      Enable VAD
-                    </label>
-                  </div>
+                <p class="nm-help">Stream microphone audio to live transcription over WebSocket and watch the transcript update in real time.</p>
+                <div class="nm-step-list">
+                  <div class="nm-step"><span>1</span> Start live</div>
+                  <div class="nm-step"><span>2</span> Stop when done</div>
+                  <div class="nm-step"><span>3</span> Process extras</div>
                 </div>
+                <div class="nm-divider"></div>
+                <details class="nm-advanced">
+                  <summary>Advanced settings</summary>
+                  <div class="nm-advanced-body">
+                    <div class="nm-grid nm-grid-2">
+                      <div class="nm-field">
+                        <label for="live-language">Language (optional) <span class="nm-tip" data-tip="Leave empty to auto-detect.">?</span></label>
+                        <input id="live-language" class="nm-input" placeholder="auto" data-live-language />
+                      </div>
+                      <div class="nm-field">
+                        <label for="live-model">Model <span class="nm-tip" data-tip="Bigger models are more accurate but slower.">?</span></label>
+                        <select id="live-model" class="nm-select" data-live-model>
+                          <option value="tiny">tiny</option>
+                          <option value="base" selected>base</option>
+                          <option value="small">small</option>
+                          <option value="medium">medium</option>
+                          <option value="large">large</option>
+                        </select>
+                      </div>
+                      <div class="nm-field">
+                        <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
+                          <span>Enable VAD <span class="nm-tip" data-tip="Skips silent audio to keep transcription clean.">?</span></span>
+                          <input type="checkbox" data-live-vad />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </details>
                 <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
                   <button class="nm-btn nm-btn-primary" type="button" data-live-start>Start live</button>
                   <button class="nm-btn nm-btn-ghost" type="button" data-live-stop disabled>Stop</button>
                   <button class="nm-btn nm-btn-soft" type="button" data-live-clear disabled>Clear</button>
                 </div>
                 <div class="nm-divider"></div>
-                <div class="nm-output nm-output-scroll" data-live-output>Start WhisperLive to see real-time transcription.</div>
+                <div class="nm-presets" data-live-presets>
+                  <button class="nm-preset is-active" type="button" data-live-preset="transcript" aria-pressed="true">Transcript only</button>
+                  <button class="nm-preset" type="button" data-live-preset="summary" aria-pressed="false">Summary</button>
+                  <button class="nm-preset" type="button" data-live-preset="translate" aria-pressed="false">Translate</button>
+                </div>
+                <p class="nm-help">Pick extras after you finish dictating.</p>
+                <div class="nm-toggle-grid">
+                  <label class="nm-toggle"><span>Translate <span class="nm-tip" data-tip="Adds a translated version of the transcript.">?</span></span><input type="checkbox" data-live-task="translate"></label>
+                  <label class="nm-toggle"><span>Summarize <span class="nm-tip" data-tip="Creates a short summary from the transcript.">?</span></span><input type="checkbox" data-live-task="summarize"></label>
+                </div>
+                <div class="nm-grid nm-grid-2" style="margin-top: 16px;">
+                  <div class="nm-field">
+                    <label for="live-target-language">Target language <span class="nm-tip" data-tip="Used only when Translate is enabled. Example: en, de, fr.">?</span></label>
+                    <input id="live-target-language" class="nm-input" placeholder="en, de, fr" data-live-target-language />
+                  </div>
+                  <div class="nm-field">
+                    <label for="live-summary-style">Summary style <span class="nm-tip" data-tip="Choose how concise the summary should be.">?</span></label>
+                    <select id="live-summary-style" class="nm-select" data-live-summary-style>
+                      <option value="bullet">Bullet highlights</option>
+                      <option value="executive">Executive summary</option>
+                      <option value="action">Action items</option>
+                      <option value="protocol_detailed">Protokoll – ausführlich</option>
+                      <option value="protocol_compact">Protokoll – kompakt</option>
+                    </select>
+                  </div>
+                </div>
+                <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button class="nm-btn nm-btn-primary" type="button" data-live-process disabled>Process live</button>
+                </div>
+                <div class="nm-divider"></div>
+                <div class="nm-tabs">
+                  <button class="nm-tab active" type="button" data-live-tab="transcript">Transcript</button>
+                  <button class="nm-tab" type="button" data-live-tab="summary">Summary</button>
+                  <button class="nm-tab" type="button" data-live-tab="translation">Translation</button>
+                </div>
+                <div class="nm-output nm-output-scroll" data-live-panel="transcript" data-live-output>Start live transcription to see real-time transcription.</div>
+                <div class="nm-output nm-output-scroll" data-live-panel="summary" hidden>Summaries appear after processing.</div>
+                <div class="nm-output nm-output-scroll" data-live-panel="translation" hidden>Translations appear after processing.</div>
                 <div class="nm-divider"></div>
                 <div style="display: flex; flex-wrap: wrap; gap: 10px;">
                   <button class="nm-btn nm-btn-ghost" type="button" data-live-download="transcript">Download TXT</button>
@@ -364,6 +478,89 @@
                   <button class="nm-btn nm-btn-ghost" type="button" data-live-download="subtitles">Download SRT</button>
                   <button class="nm-btn nm-btn-ghost" type="button" data-live-download="json">Download JSON</button>
                 </div>
+              </section>
+            </div>
+          </section>
+
+          <section class="nm-studio-panel" data-studio-panel="tts" id="studio-tts" hidden>
+            <div class="nm-app-grid">
+              <section class="nm-panel nm-reveal" data-reveal data-tts-panel>
+                <div class="nm-live-header">
+                  <h3>Text to speech</h3>
+                  <span class="nm-chip" data-tts-status>Idle</span>
+                </div>
+                <p class="nm-help">Turn text into speech with the Qwen TTS gateway.</p>
+                <p class="nm-help" data-tts-model>Loaded model: --</p>
+                <div class="nm-divider"></div>
+                <div class="nm-field">
+                  <label for="tts-text">Text</label>
+                  <textarea id="tts-text" class="nm-textarea" placeholder="Paste or type the text you want to speak." data-tts-text></textarea>
+                </div>
+                <div class="nm-grid nm-grid-2" style="margin-top: 16px;">
+                  <div class="nm-field">
+                    <label for="tts-mode">Mode</label>
+                    <select id="tts-mode" class="nm-select" data-tts-mode>
+                      <option value="voice_design" selected>Voice design</option>
+                      <option value="custom_voice">Custom voice (speaker)</option>
+                      <option value="voice_clone">Base voice clone (requires reference audio)</option>
+                    </select>
+                  </div>
+                  <div class="nm-field">
+                    <label for="tts-language">Language</label>
+                    <select id="tts-language" class="nm-select" data-tts-language>
+                      <option value="Auto" selected>Auto</option>
+                      <option value="English">English</option>
+                      <option value="German">German</option>
+                      <option value="French">French</option>
+                      <option value="Spanish">Spanish</option>
+                      <option value="Japanese">Japanese</option>
+                      <option value="Korean">Korean</option>
+                      <option value="Chinese">Chinese</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="nm-grid nm-grid-2" data-tts-group="voice-design" style="margin-top: 16px;">
+                  <div class="nm-field" style="grid-column: 1 / -1;">
+                    <label for="tts-instruct">Voice description</label>
+                    <textarea id="tts-instruct" class="nm-textarea" placeholder="Professional female voice, clear and articulate." data-tts-instruct></textarea>
+                  </div>
+                </div>
+                <div class="nm-grid nm-grid-2" data-tts-group="custom" style="margin-top: 16px;" hidden>
+                  <div class="nm-field">
+                    <label for="tts-speaker">Speaker</label>
+                    <select id="tts-speaker" class="nm-select" data-tts-speaker>
+                      <option value="Vivian" selected>Vivian</option>
+                      <option value="Ryan">Ryan</option>
+                    </select>
+                  </div>
+                  <div class="nm-field">
+                    <label for="tts-style">Style / emotion (optional)</label>
+                    <input id="tts-style" class="nm-input" placeholder="e.g., very happy, calm, confident" data-tts-style />
+                  </div>
+                </div>
+                <div class="nm-grid nm-grid-2" data-tts-group="voice-clone" style="margin-top: 16px;" hidden>
+                  <p class="nm-help" style="grid-column: 1 / -1;">Base voice clone requires a reference audio sample.</p>
+                  <div class="nm-field">
+                    <label for="tts-ref-audio">Reference audio</label>
+                    <input id="tts-ref-audio" class="nm-input" type="file" accept="audio/*" data-tts-ref-audio />
+                  </div>
+                  <div class="nm-field">
+                    <label for="tts-ref-text">Reference transcript (optional)</label>
+                    <input id="tts-ref-text" class="nm-input" placeholder="Transcript of the reference audio" data-tts-ref-text />
+                  </div>
+                  <div class="nm-field" style="grid-column: 1 / -1;">
+                    <label class="nm-toggle" style="justify-content: flex-start; gap: 10px;">
+                      <input type="checkbox" data-tts-x-vector />
+                      Use x-vector only (no transcript)
+                    </label>
+                  </div>
+                </div>
+                <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+                  <button class="nm-btn nm-btn-primary" type="button" data-tts-generate>Generate audio</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-tts-clear>Clear</button>
+                  <button class="nm-btn nm-btn-ghost" type="button" data-tts-download disabled>Download WAV</button>
+                </div>
+                <audio class="nm-live-audio" data-tts-audio controls hidden></audio>
               </section>
             </div>
           </section>
@@ -434,6 +631,19 @@
           <button class="nm-btn nm-btn-primary" type="submit">Create account</button>
         </form>
         <p class="nm-help" data-auth-status="register" style="margin-top: 10px;"></p>
+        <form data-auth-form="verify" class="nm-grid" style="gap: 16px; margin-top: 16px;" hidden>
+          <div class="nm-field">
+            <label for="auth-verify-email">Email</label>
+            <input id="auth-verify-email" class="nm-input" type="email" required data-auth-input="verify-email" />
+          </div>
+          <div class="nm-field">
+            <label for="auth-verify-code">Verification code</label>
+            <input id="auth-verify-code" class="nm-input" type="text" inputmode="numeric" autocomplete="one-time-code" required data-auth-input="verify-code" />
+          </div>
+          <button class="nm-btn nm-btn-primary" type="submit">Verify email</button>
+          <button class="nm-btn nm-btn-ghost" type="button" data-auth-resend>Resend code</button>
+        </form>
+        <p class="nm-help" data-auth-status="verify" style="margin-top: 10px;" hidden></p>
       </div>
     </div>
   </div>

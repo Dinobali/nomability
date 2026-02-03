@@ -12,12 +12,14 @@ model User {
   email        String       @unique
   passwordHash String?
   name         String?
+  emailVerifiedAt DateTime?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
   memberships  Membership[]
   jobs         Job[]
   magicLinks   MagicLinkToken[]
+  emailVerificationTokens EmailVerificationToken[]
   resetTokens  PasswordResetToken[]
   invoiceRequests InvoiceRequest[]
 }
@@ -92,6 +94,20 @@ model MagicLinkToken {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
 }
 
 model PasswordResetToken {
